@@ -200,7 +200,7 @@ same fixed-price proxy. Outputs: `output/backtest_*_<market>_extended.*`.
   worst year is 6–7% *worse* than staying variable and 35% worse than the layered rule (it locked in crisis prices for
   2023, in every country).
 * **This is not three independent tests.** NL, DE-LU and BE day-ahead prices are coupled (2022 averages €242 / €235 /
-  €245 per MWh) and the gas leg (≈ 55% of the all-variable bill) is the same TTF series everywhere. The countries
+  €245 per MWh) and the gas leg (about 52% of the all-variable bill) is the same TTF series everywhere. The countries
   differ by less than 2.5% on any total. It shows the result doesn't hinge on a Dutch power quirk; it is still one
   European price history.
 * **Adding 2020 (a calm, falling year) doesn't change the order.** In 2020 all hedges lost a little (all variable
