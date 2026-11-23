@@ -18,7 +18,7 @@ Use `output/pitch_cycle.png` as the main chart and `output/pitch_2022.png` as th
 
 ## Backtest 2021–2025 (strict, realised annual bill, €k)
 
-| Year | All variable | Fix 100% Oct (typical) | Tranches 100% | **Tranches 60%** | **Layered 2y (40+40%)** | HedgeWise γ=0.5 |
+| Year | All variable | Fix 100% Oct (typical) | Tranches 100% | **Tranches 60%** | **Layered 2y (40+40%)** | HedgeWise policy γ=0.5 |
 |---|---|---|---|---|---|---|
 | 2021 | 1,086 | 346 | 295 | 611 | 480 | 665 |
 | 2022 | 2,670 | 1,459 | 1,312 | 1,855 | 1,177 | 1,892 |
@@ -30,6 +30,26 @@ Use `output/pitch_cycle.png` as the main chart and `output/pitch_2022.png` as th
 | **Biggest jump** | 1,584 | 2,853 | 2,150 | 1,244 | **930** | 1,227 |
 
 Full table, including γ = 0.3 / 0.8 and "Fix 60% at once": `output/backtest_results.csv`, `backtest_stability.csv`, `backtest_log.txt`.
+
+### The HedgeWise policy (v0.4): what the capped, layered plan changed — nothing, in this backtest
+
+The policy (`policy_plan` in `hedgewise_model.py`) takes the optimizer's target share (γ = 0.5), caps its rise at **20 percentage points** between consecutive monthly decision dates, and buys the remainder in equal monthly tranches. It never front-loads and never sells back.
+
+**Why 20 points** (decided before running the backtest, and not tuned on it): there are 6 monthly decision dates per buying season, so 5 steps. 5 × 20 = 100%, so the cap can never stop a plan from reaching a full hedge within one season; it only stops a one-month jump after a volatility spike. The first decision date of a season has no previous target, so it is uncapped.
+
+**Result, compared honestly with the simple rules (€k, 2021–2025):**
+
+| | Total | Worst year | Biggest jump |
+|---|---|---|---|
+| HedgeWise policy γ=0.5 | 7,195 | 2,901 | 1,227 |
+| Tranches 6× (60%) | 6,713 | 2,472 | 1,244 |
+| Layered 2 years (40+40%) | **6,602** | **2,107** | **930** |
+
+* **The cap never kicked in.** In all five seasons the optimizer's target was highest on the first date and drifted down afterwards (e.g. for 2023: 85% → 70%). So the policy produced **exactly the same trades as the existing optimizer column** (γ = 0.5).
+* It is **worse than both simple rules** on total (+€0.48m vs 60% tranches, +€0.59m vs layered) and on worst year (+€0.43m, +€0.79m). Its biggest jump is the same as 60% tranches (−€17k) and worse than layered (+€0.30m).
+* **Why:** the procyclicality is *between* seasons, not within one. In H2 2022, after the price spike, GARCH volatility was high on the very first decision date, so the target started at 85–90% and the policy locked in crisis prices for 2023. A month-to-month cap that starts fresh each season can't see that.
+* **What would address it** (not done, because the cap mustn't be tuned on these results): carry the previous season's target over as the starting point of the cap, or add mean reversion to the gas model. Decide either one on reasoning first, then test it once.
+* **Pitch implication:** sell the *discipline* (60% in tranches or a 2-year ladder) as the recommendation, and the model as the tool that *measures* the risk (bad-case bill, stress test, frontier). Don't claim the optimizer beats simple rules.
 
 ### Two things the jury will ask about
 

@@ -18,6 +18,8 @@ Strategies
   Layered 2 years        40% fixed in 6 monthly tranches in H2 of Y-2, another 40% in H2 of Y-1, 20% variable
                          (standard utility practice; the fixed price two years ahead uses the same spot proxy)
   HedgeWise (gamma)      on each decision date: re-fit, simulate, buy what the optimiser recommends now
+  HedgeWise policy       on each decision date: re-fit, take the optimiser's share (gamma 0.5) as the target,
+                         cap its rise at 20 points per month, buy the rest in equal monthly tranches (policy_plan)
 
 Usage
   python backtest.py                                   # years 2021-2025, risk aversion 0.3 / 0.5 / 0.8
@@ -37,6 +39,7 @@ import company_input
 import hedgewise_model as hw
 
 DECISION_MONTHS = [6, 7, 8, 9, 10, 11]   # as-of = last day of these months in year Y-1
+POLICY_GAMMA = 0.5                         # risk aversion used by the HedgeWise policy (layered, capped)
 
 
 def realised_monthly(df: pd.DataFrame, year: int) -> dict[str, np.ndarray]:
@@ -76,6 +79,8 @@ def run_year(df, company, year, lambdas, n_paths, seed, typical_month, verbose=T
 
     fp, models, analyses = {}, {}, {}
     hedged = {lam: {"gas": [], "power": []} for lam in lambdas}   # list of (fraction, price)
+    policy = {"gas": [], "power": []}                               # HedgeWise policy (gamma POLICY_GAMMA)
+    policy_log, prev_target = [], None
     calib = None
     for k, d in enumerate(dates):
         t0 = time.time()
@@ -84,9 +89,11 @@ def run_year(df, company, year, lambdas, n_paths, seed, typical_month, verbose=T
         fp[d] = {c: fixed_price(df, c, d, ds, m) for c in vol}
         sims = hw.simulate(m, ds + pd.DateOffset(years=1) - pd.Timedelta(days=1), n_paths, seed)
         n_left = len(dates) - k
+        a_by_lam = {}
         for lam in lambdas:
             a = hw.analyse(m, company, ds, n_paths, seed, lam, max_tranches=n_left, sims=sims,
                            allow_timing=allow_timing)
+            a_by_lam[lam] = a
             if k == 0 and calib is None:
                 v = a.costs["All variable"]
                 calib = {"p05": float(np.quantile(v, .05)), "p50": float(np.median(v)),
@@ -101,6 +108,16 @@ def run_year(df, company, year, lambdas, n_paths, seed, typical_month, verbose=T
                 if buy > 1e-9:
                     hedged[lam][c].append((buy, fp[d][c]))
             analyses[(d, lam)] = r
+        a_pol = (hw.analyse(m, company, ds, n_paths, seed, POLICY_GAMMA, max_tranches=n_left, sims=sims)
+                 if POLICY_GAMMA not in lambdas else a_by_lam[POLICY_GAMMA])
+        done = sum(f for f, _ in policy["gas"])
+        plan = hw.policy_plan(a_pol, n_left, prev_target, done)
+        prev_target = plan["target"]
+        if plan["buy_now"] > 1e-9:
+            for c in ("gas", "power"):
+                policy[c].append((plan["buy_now"], fp[d][c]))
+        policy_log.append({"date": str(d.date()), "optimiser": plan["raw_target"], "target": plan["target"],
+                           "capped": plan["capped"], "bought": round(plan["buy_now"], 4)})
         if verbose:
             print(f"  {year}: decision {d.date()} fitted+simulated in {time.time()-t0:.0f}s | "
                   f"fixed price gas {fp[d]['gas']:.1f}, power {fp[d]['power']:.1f}")
@@ -125,6 +142,7 @@ def run_year(df, company, year, lambdas, n_paths, seed, typical_month, verbose=T
     fp2 = {d: {c: _fp_safe(df, c, d, ds) for c in vol} for d in dates2}
     res["Layered 2 years (40+40%)"] = cost_with(
         {c: [(0.4 / 6, fp2[d][c]) for d in dates2] + [(0.4 / 6, fp[d][c]) for d in dates] for c in vol})
+    res[f"HedgeWise policy (gamma {POLICY_GAMMA})"] = cost_with(policy)
     hw_detail = {}
     for lam in lambdas:
         res[f"HedgeWise (risk aversion {lam})"] = cost_with(hedged[lam])
@@ -133,7 +151,7 @@ def run_year(df, company, year, lambdas, n_paths, seed, typical_month, verbose=T
     once = {hw.MONTHS[d.month]: cost_with({c: [(1.0, fp[d][c])] for c in vol}) for d in dates}
     info = {"realised_avg_price": {c: float(vol[c] @ real[c] / vol[c].sum()) for c in vol},
             "fixed_prices": {str(d.date()): fp[d] for d in dates}, "hedgewise_trades": hw_detail,
-            "fix_once_by_month": once, "model_forecast_all_variable": calib}
+            "fix_once_by_month": once, "model_forecast_all_variable": calib, "policy": policy_log}
     return res, info
 
 
@@ -185,7 +203,8 @@ def plot_all_years(results: pd.DataFrame, path):
     ax = axes[0]
     x = np.arange(len(results))
     w = 0.8 / len(cols)
-    pal = ["#b8433a", "#8a8f98", "#c9a227", "#2a6fdb", "#93c5fd", "#7c3aed", "#a7f3d0", "#1b9e5a", "#0b5d33"]
+    pal = ["#b8433a", "#8a8f98", "#c9a227", "#2a6fdb", "#93c5fd", "#1b9e5a", "#7c3aed", "#fbbf24", "#a7f3d0",
+           "#0b5d33"]
     for i, c in enumerate(cols):
         ax.bar(x + i * w - 0.4 + w / 2, results[c] / 1e6, w, label=c, color=pal[i % len(pal)])
     ax.set_xticks(x, results.index)
@@ -201,7 +220,7 @@ def plot_all_years(results: pd.DataFrame, path):
     ax.barh(y + 0.2, worst, 0.4, color="#ef8a62", label="worst single year")
     ax.set_yticks(y, cols, fontsize=8)
     ax.invert_yaxis()
-    ax.legend(fontsize=8, frameon=False)
+    ax.legend(fontsize=8, frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.07), ncol=2)
     ax.set_title("Total vs worst year (EUR m)")
     ax.grid(axis="x", alpha=0.25)
     fig.tight_layout()
@@ -218,6 +237,9 @@ def plot_cycle(results: pd.DataFrame, typical_key: str, path):
               (typical_key, typical_key.replace("Fix 100% in", "Fix 100% once a year in") + " (typical)", "#6b7280", "s"),
               ("Tranches 6x (60%)", "Fix 60% in 6 monthly tranches", "#2a6fdb", "^"),
               ("Layered 2 years (40+40%)", "Layered over 2 years (40% + 40%)", "#1b9e5a", "D")]
+    pol = [k for k in results.columns if k.startswith("HedgeWise policy")]
+    if pol:
+        series.append((pol[0], "HedgeWise policy (capped, monthly tranches)", "#7c3aed", "v"))
     fig, axes = plt.subplots(1, 2, figsize=(14, 5.8), gridspec_kw={"width_ratios": [1.6, 1]})
     ax = axes[0]
     yrs = results.index.values
@@ -234,13 +256,14 @@ def plot_cycle(results: pd.DataFrame, typical_key: str, path):
     ax = axes[1]
     metrics = [("Worst year", results.max()), ("Biggest jump\nyear-on-year", results.diff().max()),
                ("Total 5 years\n/ 5 (avg year)", results.sum() / len(results))]
-    w = 0.2
+    w = 0.8 / len(series)
     x = np.arange(len(metrics))
     for i, (key, lbl, col, _) in enumerate(series):
         vals = [m[key] / 1e6 for _, m in metrics]
-        b = ax.bar(x + (i - 1.5) * w, vals, w * 0.92, color=col, label=lbl)
-        for xi, v in zip(x + (i - 1.5) * w, vals):
-            ax.text(xi, v + 0.04, f"{v:.2f}", ha="center", fontsize=7.5, color="#333")
+        off = (i - (len(series) - 1) / 2) * w
+        ax.bar(x + off, vals, w * 0.92, color=col, label=lbl)
+        for xi, v in zip(x + off, vals):
+            ax.text(xi, v + 0.04, f"{v:.2f}", ha="center", fontsize=6.2, color="#333")
     ax.set_xticks(x, [m for m, _ in metrics])
     ax.set_ylabel("EUR m")
     ax.set_title("Risk vs cost over the whole cycle", fontsize=11)
@@ -307,7 +330,7 @@ def main(argv=None):
     pd.set_option("display.width", 200)
     print("\nRealised annual bill, EUR k")
     show = (res / 1e3).round(0).astype(int)
-    show.loc["TOTAL"] = show.sum()
+    show.loc["TOTAL"] = (res.sum() / 1e3).round(0).astype(int)   # exact total (not a sum of rounded years)
     show.loc["WORST YEAR"] = (res.max() / 1e3).round(0).astype(int)
     show.loc["STDEV"] = (res.std() / 1e3).round(0).astype(int)
     show.loc["MAX JUMP"] = (res.diff().max() / 1e3).round(0).astype(int)   # biggest year-on-year increase
@@ -319,6 +342,12 @@ def main(argv=None):
     for y in args.years:
         rp = infos[y]["realised_avg_price"]
         print(f"  {y}: gas {rp['gas']:.1f}, power {rp['power']:.1f}")
+    print(f"\nHedgeWise policy (gamma {POLICY_GAMMA}, cap +{hw.POLICY_MAX_STEP:.0%}/month): optimiser -> capped target "
+          "-> bought, per decision date")
+    for y in args.years:
+        print(f"  {y}: " + " | ".join(f"{p['optimiser']:.0%}->{p['target']:.0%}{'*' if p['capped'] else ''} "
+                                      f"buy {p['bought']:.1%}" for p in infos[y]["policy"]))
+    print("  (* = capped)")
     print("\nFix 100% once - result depends on the month you pick (EUR k):")
     print((pd.DataFrame({y: infos[y]["fix_once_by_month"] for y in args.years}).T / 1e3).round(0).to_string())
     print("\nModel forecast of the all-variable bill (as of 30 Jun of the year before) vs realised (EUR k):")

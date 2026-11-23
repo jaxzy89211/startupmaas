@@ -532,6 +532,38 @@ def analyse(m: FittedModel, company: Company, delivery_start=None, n_paths=10_00
 
 
 # --------------------------------------------------------------------------------------------
+# HedgeWise policy: a disciplined layered plan on top of the optimiser
+# --------------------------------------------------------------------------------------------
+POLICY_MAX_STEP = 0.20
+# Why 20 percentage points: the buying season has 6 monthly decision dates, i.e. 5 steps between them, and
+# 5 x 20pp = 100%. So the cap never stops the plan from reaching a full hedge within one season; it only stops
+# the target from jumping (e.g. 30% -> 90%) in one month right after a volatility spike, when GARCH volatility -
+# and therefore the optimiser's target - is highest. The number follows from the calendar, not from 2021-2025
+# backtest outcomes, and it is NOT to be tuned on the backtest.
+
+
+def policy_plan(a: Analysis, months_ahead: int, prev_target: float | None = None, already: float = 0.0,
+                max_step: float = POLICY_MAX_STEP) -> dict:
+    """Turn the optimiser's (or budget mode's) target share into this month's purchase.
+
+    months_ahead : number of monthly decision dates left INCLUDING this one (6 at the start of a season)
+    prev_target  : the (capped) target set on the previous decision date; None on the first date (no cap then)
+    already      : share already fixed on earlier dates
+
+    Rules: (1) target = optimiser's share, but at most prev_target + max_step;
+           (2) the part still to buy is spread in equal monthly tranches over the remaining dates - never
+               front-loaded; (3) nothing is ever sold back (if the target fell below what is fixed, buy 0)."""
+    raw = float(a.recommendation["hedge_gas"])          # one share for gas and power (SAME_RATIO)
+    target = raw if prev_target is None else min(raw, prev_target + max_step)
+    n = max(int(months_ahead), 1)
+    buy = max(0.0, target - already) / n
+    buy = min(buy, 1.0 - already)
+    return {"raw_target": raw, "target": target, "capped": target < raw - 1e-12, "buy_now": buy,
+            "already": already, "months_ahead": n,
+            "schedule": [buy] + [max(0.0, target - already - buy) / max(n - 1, 1)] * (n - 1)}
+
+
+# --------------------------------------------------------------------------------------------
 # Historical stress scenario: "what if 2022 happens again?"  (NOT a forecast)
 # --------------------------------------------------------------------------------------------
 STRESS_BASE = ("2021-01-01", "2021-06-30")   # the calm before the crisis
