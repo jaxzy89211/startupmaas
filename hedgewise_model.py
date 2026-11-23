@@ -818,6 +818,26 @@ FRONTIER_TEXT_EN = {
 }
 
 
+def frontier_scale(a: Analysis) -> tuple[float, float]:
+    """(extra expected cost, bad-case reduction) of fixing 100% instead of 0%, along the frontier that is drawn."""
+    r = a.recommendation
+    f = a.frontier
+    f = f[(f.execution == r["execution"]) & np.isclose(f.hedge_gas, f.hedge_power)].sort_values("hedge_gas")
+    lo, hi = f.iloc[0], f.iloc[-1]
+    return float(hi.expected - lo.expected), float(lo.es95 - hi.es95)
+
+
+def frontier_scale_sentence(a: Analysis, lang: str = "en") -> str:
+    """The sentence under the trade-off chart that makes its scale explicit."""
+    x, y = frontier_scale(a)
+    if lang == "nl":
+        k = lambda v: (f"€\u00a0{round(v, -3):,.0f}".replace(",", ".") if abs(v) < 1e6
+                       else f"€\u00a0{v/1e6:.2f}\u00a0mln".replace(".", ","))
+        return f"Alles vastzetten kost gemiddeld {k(x)} meer en verlaagt het slechte scenario met {k(y)}."
+    k = lambda v: f"€{v/1e3:,.0f}k" if abs(v) < 1e6 else f"€{v/1e6:.2f}m"
+    return f"Fixing everything costs {k(x)} more on average and cuts the bad case by {k(y)}."
+
+
 def plot_frontier(a: Analysis, ax=None, path=None, text: dict | None = None, show_tradeoff: bool = True):
     """Efficient frontier: expected bill vs bad-case bill (ES95) for one hedge ratio 0-100% (gas and power),
     executed the recommended way. The CFO picks a point; HedgeWise marks the one for their risk appetite.

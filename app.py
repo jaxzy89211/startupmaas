@@ -151,6 +151,7 @@ except Exception as e:  # noqa: BLE001  (never let the report break the demo)
 buf = io.BytesIO()          # in memory: no shared file when several people use the demo at once
 hw.plot_analysis(a, buf)
 st.image(buf.getvalue(), width="stretch")
+st.caption("Bottom left, the trade-off chart: " + hw.frontier_scale_sentence(a, "en"))
 
 if stress:
     st.subheader("What if 2022 happens again?")

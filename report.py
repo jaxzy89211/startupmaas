@@ -255,6 +255,7 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
     buf.seek(0)
     story.append(Image(buf, width=W, height=W * 2.9 / 8.2))
     story.append(Paragraph(T["chart_note"], ss["small"]))
+    story.append(Paragraph(hw.frontier_scale_sentence(a, lang), ss["body"]))
 
     # recommendation
     story.append(Paragraph(T["rec_h"], ss["h"]))
