@@ -9,6 +9,7 @@ import pandas as pd
 
 from ._types import PathOrBuffer
 from .models import POWER_FIT_DAYS, FittedModel, _power_design
+from .moneyfmt import money_axis, money_unit
 from .provenance import save_figure
 from .settings import STRESS_KEYS
 from .strategies import Analysis
@@ -37,14 +38,15 @@ def plot_stress(
     scs = s["scenarios"]
     w = 0.2
     fs = 7 if compact else 9
-    top = max(v for sc in scs for v in sc["bills"].values()) / 1e6
+    allv = [v for sc in scs for v in sc["bills"].values()]
+    top = max(allv)
+    unit = money_unit(allv, lang)
     for j, key in enumerate(STRESS_KEYS):
         xs = np.arange(len(scs)) + (j - 1.5) * w
-        vals = [sc["bills"][key] / 1e6 for sc in scs]
+        vals = [sc["bills"][key] for sc in scs]  # raw euros; money_axis sets the unit
         ax.bar(xs, vals, w * 0.92, color=colors[j], label=names[j])
         for x, v in zip(xs, vals, strict=False):
-            t = f"{v:.2f}" if lang == "en" else f"{v:.2f}".replace(".", ",")
-            ax.text(x, v + top * 0.015, t, ha="center", va="bottom", fontsize=fs - 0.5)
+            ax.text(x, v + top * 0.015, unit.fmt(v), ha="center", va="bottom", fontsize=fs - 0.5)
     ticks = []
     for sc in scs:
         p = sc["avg_price"]
@@ -54,7 +56,7 @@ def plot_stress(
             ticks.append(f"{sc['label']['nl']}\n(gas gem. € {p['gas']:.0f}, stroom € {p['power']:.0f}/MWh)")
     ax.set_xticks(np.arange(len(scs)), ticks, fontsize=fs)
     ax.set_ylim(0, top * 1.22)
-    ax.set_ylabel("€ m" if lang == "en" else "€ mln", fontsize=fs)
+    money_axis(ax, allv, lang, "y", fontsize=fs)
     ax.tick_params(axis="y", labelsize=fs)
     # legend in the empty top-left corner (the "repeat" bars are lower than the "shock" bars)
     ax.legend(
@@ -117,15 +119,17 @@ def plot_analysis(a: Analysis, path: PathOrBuffer) -> None:
     ax = axes[1, 1]
     t = a.table
     y = np.arange(len(t))
-    ax.barh(y, t.expected / 1e6, color="#cbd5e1", label="Expected")
-    ax.barh(y, (t.es95 - t.expected) / 1e6, left=t.expected / 1e6, color="#ef8a62", label="extra in worst 5% (ES95)")
+    unit = money_unit(t.es95, "en")
+    ax.barh(y, t.expected, color="#cbd5e1", label="Expected")
+    ax.barh(y, t.es95 - t.expected, left=t.expected, color="#ef8a62", label="extra in worst 5% (ES95)")
     for i, (_e, es) in enumerate(zip(t.expected, t.es95, strict=False)):
-        ax.text(es / 1e6, i, f"  {es / 1e6:.2f}", va="center", fontsize=8)
+        ax.text(es, i, f"  {unit.fmt(es)}", va="center", fontsize=8)
     ax.set_yticks(y, [n.replace(" (", "\n(") for n in t.index], fontsize=8)
     ax.invert_yaxis()
-    ax.set_title("Expected bill vs bad-case bill (EUR m)")
+    ax.set_title("Expected bill vs bad-case bill")
     ax.legend(fontsize=8, frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.06), ncol=2)
-    ax.set_xlim(0, t.es95.max() / 1e6 * 1.12)
+    ax.set_xlim(0, t.es95.max() * 1.12)
+    money_axis(ax, t.es95, "en", "x", "bill")
     ax.grid(alpha=0.25, axis="x")
     fig.suptitle(f"HedgeWise - {a.company.name}", fontsize=13, weight="bold")
     fig.tight_layout()
@@ -135,12 +139,12 @@ def plot_analysis(a: Analysis, path: PathOrBuffer) -> None:
 
 FRONTIER_TEXT_EN = {
     "title": "Pick your trade-off: share of next year's energy fixed",
-    "xlabel": "Bad-case bill: average of worst 5% of scenarios (EUR m)",
-    "ylabel": "Expected bill (EUR m)",
+    "xlabel": "Bad-case bill: average of worst 5% of scenarios",
+    "ylabel": "Expected bill",
     "pick": "HedgeWise pick: fix {h} (risk aversion {g})",
     "pick_budget": "HedgeWise pick: fix {h} (budget)",
     "pick_ladder": "HedgeWise ladder: fix {h}",
-    "xlabel_honest": "Bad case: the worse of the model's worst 5% and a 2021->22-size shock (EUR m)",
+    "xlabel_honest": "Bad case: the worse of the model's worst 5% and a 2021->22-size shock",
     "stress_points": "open dot = bad case set by the shock scenario",
     "tradeoff": "Each extra 10% fixed: about EUR {e}k more on average,\nEUR {es}k less in the bad case",
     "decimal": ".",
@@ -163,7 +167,6 @@ def plot_frontier(
 
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    from matplotlib.ticker import FuncFormatter
 
     tx = {**FRONTIER_TEXT_EN, **(text or {})}
     own = ax is None
@@ -173,14 +176,14 @@ def plot_frontier(
     f = a.frontier
     f = f[(f.execution == r["execution"]) & (np.isclose(f.hedge_gas, f.hedge_power))].sort_values("hedge_gas")
     bc = "bad_case" if "bad_case" in f else "es95"  # the honest bad case if honest_bad_case() was applied
-    ax.plot(f[bc] / 1e6, f.expected / 1e6, "-", color="#2a6fdb", lw=1.8, zorder=2)
+    ax.plot(f[bc], f.expected, "-", color="#2a6fdb", lw=1.8, zorder=2)
     for _, row in f.iterrows():
         h = row.hedge_gas
         is_lbl = np.isclose(h % 0.25, 0) or np.isclose(h % 0.25, 0.25)
         stress = row.get("bad_case_source", "model") == "stress"  # hollow: the bad case comes from the stress test
         ax.plot(
-            row[bc] / 1e6,
-            row.expected / 1e6,
+            row[bc],
+            row.expected,
             "o",
             ms=6 if is_lbl else 3,
             zorder=3,
@@ -190,7 +193,7 @@ def plot_frontier(
         if is_lbl:
             ax.annotate(
                 f"{h:.0%}",
-                (row[bc] / 1e6, row.expected / 1e6),
+                (row[bc], row.expected),
                 textcoords="offset points",
                 xytext=(4, 6),
                 fontsize=9,
@@ -201,10 +204,10 @@ def plot_frontier(
         h_txt = f"{r['hedge_gas']:.0%}"
         key = "pick_budget" if r["mode"] == "budget" else ("pick_ladder" if r.get("rule") == "ladder" else "pick")
         lbl = tx[key].format(h=h_txt, g=str(r["risk_aversion"]).replace(".", tx["decimal"]))
-        ax.plot(rec[bc].iloc[0] / 1e6, rec.expected.iloc[0] / 1e6, "*", ms=18, color="#1b9e5a", zorder=4, label=lbl)
+        ax.plot(rec[bc].iloc[0], rec.expected.iloc[0], "*", ms=18, color="#1b9e5a", zorder=4, label=lbl)
     for i, (lbl, es, ex) in enumerate(extra_points or []):
         mk, col = "DsP^v"[i % 5], ["#d97706", "#b45309", "#7c2d12", "#ea580c", "#9a3412"][i % 5]
-        ax.plot(es / 1e6, ex / 1e6, mk, ms=8, color=col, mec="white", mew=0.8, zorder=5, ls="none", label=lbl)
+        ax.plot(es, ex, mk, ms=8, color=col, mec="white", mew=0.8, zorder=5, ls="none", label=lbl)
     if show_tradeoff and len(f) > 2:
         lo, hi = f.iloc[0], f.iloc[-1]
         d_e = (hi.expected - lo.expected) / 10 / 1e3
@@ -217,18 +220,16 @@ def plot_frontier(
             fontsize=9,
             color="#333",
         )
-    if tx["decimal"] == ",":
-        fmt = FuncFormatter(lambda v, _: f"{v:.2f}".replace(".", ","))
-        ax.xaxis.set_major_formatter(fmt)
-        ax.yaxis.set_major_formatter(fmt)
     ax.margins(x=0.07, y=0.12)  # room for the 0% / 100% labels at the ends
     if extra_points and show_tradeoff:  # keep the trade-off note (bottom left) clear of the investment points
         lo, hi = ax.get_ylim()
         ax.set_ylim(lo - 0.2 * (hi - lo), hi)
-    ax.set_xlabel(tx["xlabel_honest"] if bc == "bad_case" else tx["xlabel"])
+    lang = "nl" if tx["decimal"] == "," else "en"
+    xs = list(f[bc]) + [p[1] for p in (extra_points or [])]
+    money_axis(ax, xs, lang, "x", tx["xlabel_honest"] if bc == "bad_case" else tx["xlabel"])
     if bc == "bad_case" and (f.bad_case_source == "stress").any():
         ax.plot([], [], "o", color="#2a6fdb", mfc="white", ms=6, ls="none", label=tx["stress_points"])
-    ax.set_ylabel(tx["ylabel"])
+    money_axis(ax, list(f.expected) + [p[2] for p in (extra_points or [])], lang, "y", tx["ylabel"])
     ax.set_title(tx["title"])
     ax.legend(fontsize=8, frameon=False, loc="upper right")
     ax.grid(alpha=0.25)

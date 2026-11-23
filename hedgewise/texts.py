@@ -112,12 +112,12 @@ TEXT = {
         "fixed_real": "de vaste prijzen zijn echte termijnprijzen ({products})",
         "chart": {
             "title": "Kies uw afweging: deel van volgend jaar vastgezet",
-            "xlabel": "Slecht scenario: gemiddelde van de 5% duurste scenario's (€ mln)",
-            "ylabel": "Verwachte rekening (€ mln)",
+            "xlabel": "Slecht scenario: gemiddelde van de 5% duurste scenario's",
+            "ylabel": "Verwachte rekening",
             "pick": "HedgeWise-advies: {h} vastzetten (risicoaversie {g})",
             "pick_budget": "HedgeWise-advies: {h} vastzetten (budget)",
             "pick_ladder": "HedgeWise-ladder: {h} vastzetten",
-            "xlabel_honest": "Slecht scenario: de hoogste van het model (5% duurste) en een schok als 2021->22 (€ mln)",
+            "xlabel_honest": "Slecht scenario: de hoogste van het model (5% duurste) en een schok als 2021->22",
             "stress_points": "open punt = slecht scenario uit de schok",
             "tradeoff": "Elke extra 10% vast: gemiddeld ca. € {e}k meer,\n€ {es}k minder in het slechte scenario",
             "decimal": ",",
@@ -125,9 +125,9 @@ TEXT = {
     },
 }
 TEXT["en"]["chart"] = {
-    "xlabel": "Bad case: average of the worst 5% of scenarios (€ m)",
-    "ylabel": "Expected bill (€ m)",
-    "xlabel_honest": "Bad case: the worse of the model's worst 5% and a 2021->22-size shock (€ m)",
+    "xlabel": "Bad case: average of the worst 5% of scenarios",
+    "ylabel": "Expected bill",
+    "xlabel_honest": "Bad case: the worse of the model's worst 5% and a 2021->22-size shock",
 }
 NL_MONTHS = [
     "januari",

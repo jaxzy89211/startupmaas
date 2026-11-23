@@ -278,7 +278,7 @@ TXT = {
         "bought": "bought",
         "planned": "planned by now",
         "target": "target",
-        "bad_hist": "Bad case over time (EUR m)",
+        "bad_hist": "Bad case over time",
         "now_vs": "Now: expected {e}, bad case {b}. With the full plan: expected {pe}, bad case {pb}. "
         "All variable: bad case {v}.",
         "footer": "HedgeWise monthly update. Commodity cost only; the fixed price is a proxy for forward prices "
@@ -319,7 +319,7 @@ TXT = {
         "bought": "gekocht",
         "planned": "gepland tot nu",
         "target": "doel",
-        "bad_hist": "Slecht scenario door de tijd (EUR mln)",
+        "bad_hist": "Slecht scenario door de tijd",
         "now_vs": "Nu: verwacht {e}, slecht scenario {b}. Met het hele plan: verwacht {pe}, slecht scenario {pb}. "
         "Alles variabel: slecht scenario {v}.",
         "footer": "HedgeWise maandelijkse update. Alleen de kosten van de energie zelf; de vaste prijs is een "
@@ -441,7 +441,10 @@ def progress_chart(res: dict, lang: str, path: io.BytesIO) -> None:
     ax.spines[["top", "right", "left"]].set_visible(False)
     h = hist.sort_values("run_date")
     x = np.arange(len(h))  # one tick per monthly run, labelled with its date
-    ax2.plot(x, h.bad_case_now / 1e6, "o-", color="#b8433a", ms=4)
+    ax2.plot(x, h.bad_case_now, "o-", color="#b8433a", ms=4)
+    from .moneyfmt import money_axis
+
+    money_axis(ax2, h.bad_case_now, lang, "y", fontsize=7)
     ax2.set_xticks(x, [d[2:] for d in h.run_date], fontsize=7)  # 'yy-mm-dd'
     ax2.set_xlim(-0.5, max(len(h) - 0.5, 1.5))
     ax2.set_title(T["bad_hist"], fontsize=9)

@@ -40,6 +40,7 @@ import pandas as pd
 
 import hedgewise as hw
 from hedgewise import backtest as bt
+from hedgewise.moneyfmt import money_axis
 from hedgewise.provenance import current, one_line, save_figure, write_csv
 from hedgewise.settings import BACKTEST, POWER_FLOOR
 
@@ -266,7 +267,7 @@ def plot_robustness(summary: pd.DataFrame, per: pd.DataFrame, path: str) -> None
     fig, axes = plt.subplots(
         1, len(fams) + 1, figsize=(7.2 * len(fams) + 6.5, 8.2), gridspec_kw={"width_ratios": [1] * len(fams) + [0.95]}
     )
-    from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
+    from matplotlib.ticker import LogLocator
 
     titles = {
         "model": "{n:,} futures from the default model",
@@ -276,12 +277,12 @@ def plot_robustness(summary: pd.DataFrame, per: pd.DataFrame, path: str) -> None
         s = summary[summary.family == fam]
         for r in s.itertuples():
             c = COLORS.get(r.strategy, "k")
-            x, y = r.median_total / 1e6, r.median_worst_year / 1e6
+            x, y = r.median_total, r.median_worst_year  # raw euros; money_axis sets the unit
             ax.errorbar(
                 x,
                 y,
-                xerr=[[x - r.total_p05 / 1e6], [r.total_p95 / 1e6 - x]],
-                yerr=[[y - r.worst_year_p05 / 1e6], [r.p95_worst_year / 1e6 - y]],
+                xerr=[[x - r.total_p05], [r.total_p95 - x]],
+                yerr=[[y - r.worst_year_p05], [r.p95_worst_year - y]],
                 fmt="o",
                 color=c,
                 ms=9,
@@ -292,16 +293,22 @@ def plot_robustness(summary: pd.DataFrame, per: pd.DataFrame, path: str) -> None
             )
         ax.set_xscale("log")
         ax.set_yscale("log")
-        ax.set_xlabel("8-year total bill, EUR m (dot = median, whiskers = 5-95%)")
-        ax.set_ylabel("Worst single year, EUR m (dot = median, whiskers = 5-95%)")
         ax.set_title(
             titles[fam].format(n=int(s.n.iloc[0])) + "\n(legend: % of histories that beat all-variable)", fontsize=10
         )
         ax.grid(alpha=0.25, which="both")
         for axis in (ax.xaxis, ax.yaxis):
             axis.set_major_locator(LogLocator(subs=(1, 2, 5) if fam == "model" else (1,)))
-            axis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:,.0f}" if v >= 1 else f"{v:g}"))
-            axis.set_minor_formatter(NullFormatter())
+        money_axis(
+            ax, list(s.total_p95) + list(s.total_p05), "en", "x", "8-year total bill; dot = median, whiskers = 5-95%"
+        )
+        money_axis(
+            ax,
+            list(s.p95_worst_year) + list(s.worst_year_p05),
+            "en",
+            "y",
+            "Worst single year; dot = median, whiskers = 5-95%",
+        )
         ax.legend(fontsize=7.5, frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=2)
     ax = axes[-1]
     st = per[per.family == "stress"]
@@ -309,7 +316,7 @@ def plot_robustness(summary: pd.DataFrame, per: pd.DataFrame, path: str) -> None
     strategies = list(dict.fromkeys(st.strategy))
     w = 0.8 / len(strategies)
     for i, strat in enumerate(strategies):
-        vals = [st[(st.history == n) & (st.strategy == strat)].total.iloc[0] / 1e6 for n in names]
+        vals = [st[(st.history == n) & (st.strategy == strat)].total.iloc[0] for n in names]
         ax.barh(
             np.arange(len(names)) + (i - len(strategies) / 2 + 0.5) * w,
             vals,
@@ -319,7 +326,7 @@ def plot_robustness(summary: pd.DataFrame, per: pd.DataFrame, path: str) -> None
         )
     ax.set_yticks(np.arange(len(names)), names)
     ax.invert_yaxis()
-    ax.set_xlabel("8-year total bill, EUR m")
+    money_axis(ax, st.total, "en", "x", "8-year total bill")
     ax.set_title("Named stress histories (one path each)", fontsize=11)
     ax.grid(alpha=0.25, axis="x")
     fig.suptitle(

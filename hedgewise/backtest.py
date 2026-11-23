@@ -41,6 +41,7 @@ import pandas as pd
 import hedgewise as hw
 from hedgewise import company_input
 from hedgewise._types import DateLike, PathOrBuffer
+from hedgewise.moneyfmt import money_axis, money_unit
 from hedgewise.provenance import one_line, save_figure, write_csv, write_json
 from hedgewise.settings import BACKTEST
 
@@ -261,7 +262,8 @@ def plot_pitch(results: pd.DataFrame, info: dict, year: int, company: hw.Company
     r = results.loc[year]
     fix_key = [k for k in r.index if k.startswith("Fix 100%")][0]
     once = info[year]["fix_once_by_month"]
-    vals = [r["All variable"] / 1e6, r[fix_key] / 1e6, r["Tranches 6x (100%)"] / 1e6]
+    vals = [r["All variable"], r[fix_key], r["Tranches 6x (100%)"]]  # raw euros; money_axis sets the unit
+    u = money_unit(list(vals) + list(once.values()), "en")
     labels = [
         "All variable\n(no hedge)",
         fix_key.replace("Fix 100% in", "Fix 100% at once\nin") + "\n(typical renewal)",
@@ -270,21 +272,21 @@ def plot_pitch(results: pd.DataFrame, info: dict, year: int, company: hw.Company
     colors = ["#b8433a", "#8a8f98", "#1b9e5a"]
     fig, ax = plt.subplots(figsize=(10, 6.2))
     bars = ax.bar(labels, vals, color=colors, width=0.6)
-    lo, hi = min(once.values()) / 1e6, max(once.values()) / 1e6
+    lo, hi = min(once.values()), max(once.values())
     ax.errorbar(1, vals[1], yerr=[[vals[1] - lo], [hi - vals[1]]], color="k", capsize=10, lw=1.5)
     ax.text(
         1.33,
         hi,
-        f"fixing once in Jul...Dec:\nanywhere from EUR {lo:.2f}m\nto EUR {hi:.2f}m",
+        f"fixing once in Jul...Dec:\nanywhere from {u.text(lo)}\nto {u.text(hi)}",
         fontsize=9,
         va="top",
         color="#333",
     )
     for b_, v in zip(bars, vals, strict=False):
-        ax.text(b_.get_x() + 0.04, v * 1.01, f"EUR {v:.2f}m", ha="left", va="bottom", fontsize=12, weight="bold")
+        ax.text(b_.get_x() + 0.04, v * 1.01, u.text(v), ha="left", va="bottom", fontsize=12, weight="bold")
     save = vals[0] - vals[2]
     ax.annotate(
-        f"EUR {save:.2f}m saved\n({save / vals[0]:.0%} of the unhedged bill)",
+        f"{u.text(save)} saved\n({save / vals[0]:.0%} of the unhedged bill)",
         xy=(2.2, vals[2] * 1.08),
         xytext=(1.55, vals[0] * 0.93),
         fontsize=12,
@@ -292,7 +294,7 @@ def plot_pitch(results: pd.DataFrame, info: dict, year: int, company: hw.Company
         weight="bold",
         arrowprops=dict(arrowstyle="->", color="#1b9e5a", lw=1.5),
     )
-    ax.set_ylabel(f"Gas + power commodity cost in {year} (EUR m)")
+    money_axis(ax, list(vals) + [hi], "en", "y", f"Gas + power commodity cost in {year}")
     gas_m3 = sum(company.gas_m3) / 1e6
     pw = company.power_mwh.sum() / 1e3
     ax.set_title(
@@ -334,22 +336,23 @@ def plot_all_years(results: pd.DataFrame, path: PathOrBuffer) -> None:
         "#0b5d33",
     ]
     for i, c in enumerate(cols):
-        ax.bar(x + i * w - 0.4 + w / 2, results[c] / 1e6, w, label=c, color=pal[i % len(pal)])
+        ax.bar(x + i * w - 0.4 + w / 2, results[c], w, label=c, color=pal[i % len(pal)])
     ax.set_xticks(x, results.index)
-    ax.set_ylabel("EUR m")
+    money_axis(ax, results.values.ravel(), "en", "y", "Realised bill")
     ax.set_title("Annual energy bill by strategy (realised)")
     ax.legend(fontsize=8, frameon=False, ncol=3, loc="upper center", bbox_to_anchor=(0.5, -0.06))
     ax.grid(axis="y", alpha=0.25)
     ax = axes[1]
-    tot = results.sum() / 1e6
-    worst = results.max() / 1e6
+    tot = results.sum()
+    worst = results.max()
     y = np.arange(len(cols))
     ax.barh(y - 0.2, tot, 0.4, color="#94a3b8", label=f"total {results.index.min()}-{results.index.max()}")
     ax.barh(y + 0.2, worst, 0.4, color="#ef8a62", label="worst single year")
     ax.set_yticks(y, cols, fontsize=8)
     ax.invert_yaxis()
     ax.legend(fontsize=8, frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.07), ncol=2)
-    ax.set_title("Total vs worst year (EUR m)")
+    ax.set_title("Total vs worst year")
+    money_axis(ax, tot, "en", "x")
     ax.grid(axis="x", alpha=0.25)
     fig.tight_layout()
     save_figure(fig, path, dpi=140)
@@ -376,16 +379,16 @@ def plot_cycle(results: pd.DataFrame, typical_key: str, path: PathOrBuffer) -> N
     ax = axes[0]
     yrs = results.index.values
     for key, lbl, col, mk in series:
-        v = results[key].values / 1e6
+        v = results[key].values
         ax.plot(yrs, v, "-", marker=mk, color=col, lw=2, ms=8, label=lbl)
     ax.set_xticks(yrs)
-    ax.set_ylabel("Realised gas + power bill (EUR m)")
+    money_axis(ax, results.values.ravel(), "en", "y", "Realised gas + power bill")
     span = f"{yrs[0]}-{yrs[-1]}"
     ax.set_title(f"Annual bill, {span} (every decision uses only data available at the time)", fontsize=11)
     ax.legend(frameon=False, fontsize=9, loc="best")
     ax.grid(alpha=0.25)
     ax.spines[["top", "right"]].set_visible(False)
-    ax.set_ylim(0, results[[k for k, *_ in series]].values.max() / 1e6 * 1.1)
+    ax.set_ylim(0, results[[k for k, *_ in series]].values.max() * 1.1)
     ax = axes[1]
     metrics = [
         ("Worst year", results.max()),
@@ -394,14 +397,16 @@ def plot_cycle(results: pd.DataFrame, typical_key: str, path: PathOrBuffer) -> N
     ]
     w = 0.8 / len(series)
     x = np.arange(len(metrics))
+    allv = [m[k] for _, m in metrics for k, *_ in series]
+    u = money_unit(allv, "en")
     for i, (key, lbl, col, _) in enumerate(series):
-        vals = [m[key] / 1e6 for _, m in metrics]
+        vals = [m[key] for _, m in metrics]
         off = (i - (len(series) - 1) / 2) * w
         ax.bar(x + off, vals, w * 0.92, color=col, label=lbl)
         for xi, v in zip(x + off, vals, strict=False):
-            ax.text(xi, v + 0.04, f"{v:.2f}", ha="center", fontsize=6.2, color="#333")
+            ax.text(xi, v + max(allv) * 0.01, u.fmt(v), ha="center", fontsize=6.2, color="#333")
     ax.set_xticks(x, [m for m, _ in metrics])
-    ax.set_ylabel("EUR m")
+    money_axis(ax, allv, "en", "y")
     ax.set_title("Risk vs cost over the whole cycle", fontsize=11)
     ax.grid(alpha=0.25, axis="y")
     ax.spines[["top", "right"]].set_visible(False)
@@ -423,27 +428,34 @@ def plot_calibration(info: dict, results: pd.DataFrame, path: PathOrBuffer) -> N
         c = info[y]["model_forecast_all_variable"]
         ax.bar(
             i,
-            (c["p95"] - c["p05"]) / 1e6,
-            bottom=c["p05"] / 1e6,
+            (c["p95"] - c["p05"]),
+            bottom=c["p05"],
             width=0.18,
             color="#2a6fdb",
             alpha=0.3,
             label="model 5-95% range (as of 30 Jun, year before)" if i == 0 else None,
         )
-        ax.plot(i, c["p50"] / 1e6, "o", color="#2a6fdb", label="model median" if i == 0 else None)
-        ax.plot(
-            i, c["es95"] / 1e6, "v", color="#2a6fdb", ms=7, label="model ES95 (avg of worst 5%)" if i == 0 else None
-        )
+        ax.plot(i, c["p50"], "o", color="#2a6fdb", label="model median" if i == 0 else None)
+        ax.plot(i, c["es95"], "v", color="#2a6fdb", ms=7, label="model ES95 (avg of worst 5%)" if i == 0 else None)
         ax.plot(
             i,
-            results.loc[y, "All variable"] / 1e6,
+            results.loc[y, "All variable"],
             "D",
             color="#b8433a",
             ms=9,
             label="realised (all variable)" if i == 0 else None,
         )
     ax.set_xticks(range(len(years)), years)
-    ax.set_ylabel("All-variable bill, EUR m")
+    vals = [
+        v
+        for y in years
+        for v in (
+            info[y]["model_forecast_all_variable"]["p95"],
+            info[y]["model_forecast_all_variable"]["es95"],
+            results.loc[y, "All variable"],
+        )
+    ]
+    money_axis(ax, vals, "en", "y", "All-variable bill")
     ax.set_title("Calibration: did the realised bill fall inside the model's forecast range?")
     ax.legend(fontsize=8, frameon=False)
     ax.grid(alpha=0.25)

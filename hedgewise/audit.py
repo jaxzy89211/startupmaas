@@ -343,17 +343,17 @@ def plot_audit(r: AuditResult, path: PathOrBuffer, lang: str = "en") -> None:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    from hedgewise.moneyfmt import money_axis, money_unit
     from hedgewise.provenance import save_figure
 
-    t = r.table / 1e6
+    t = r.table  # raw euros; money_axis sets the unit
     fig, (ax, ax2) = plt.subplots(1, 2, figsize=(11.5, 4.6), gridspec_kw={"width_ratios": [2.3, 1]})
     x = np.arange(len(t))
     w = 0.8 / len(t.columns)
     for i, c in enumerate(t.columns):
         ax.bar(x + (i - (len(t.columns) - 1) / 2) * w, t[c], w * 0.92, color=COLORS[i % 6], label=label(c, lang))
     ax.set_xticks(x, [str(y) for y in t.index])
-    unit = "€ m" if lang == "en" else "€ mln"
-    ax.set_ylabel(unit)
+    money_axis(ax, t.values.ravel(), lang, "y")
     ax.set_title("Per year" if lang == "en" else "Per jaar", fontsize=10)
     ax.grid(axis="y", alpha=0.25)
     ax.spines[["top", "right"]].set_visible(False)
@@ -361,10 +361,11 @@ def plot_audit(r: AuditResult, path: PathOrBuffer, lang: str = "en") -> None:
     ax2.barh(np.arange(len(tot)), tot.values, color=COLORS[: len(tot)])
     ax2.set_yticks(np.arange(len(tot)), [label(c, lang) for c in tot.index], fontsize=8)
     ax2.invert_yaxis()
+    tunit = money_unit(tot.values, lang)
     for i, v in enumerate(tot.values):
-        ax2.text(v, i, f" {v:.2f}".replace(".", "," if lang == "nl" else "."), va="center", fontsize=8)
+        ax2.text(v, i, " " + tunit.fmt(v), va="center", fontsize=8)
     ax2.set_xlim(0, tot.max() * 1.25)
-    ax2.set_xlabel(unit)
+    money_axis(ax2, tot.values, lang, "x")
     span = f"{t.index[0]}-{t.index[-1]}" if len(t) > 1 else str(t.index[0])
     ax2.set_title(("Total " if lang == "en" else "Totaal ") + span, fontsize=10)
     ax2.spines[["top", "right"]].set_visible(False)

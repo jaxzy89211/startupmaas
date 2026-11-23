@@ -35,6 +35,7 @@ import numpy as np
 import pandas as pd
 
 from .config import load_config
+from .moneyfmt import money_axis, money_unit
 from .provenance import one_line, save_figure, write_csv
 from .settings import DATA, OUT
 
@@ -250,14 +251,17 @@ def plot_market(est: pd.DataFrame, summ: pd.DataFrame, path: Path) -> None:
     ax.set_title("Who: target companies by sector", fontsize=11)
     ax.spines[["top", "right"]].set_visible(False)
     adopt = _M["revenue"]["adoption"]
+    allrev = [summ.loc[r_, f"revenue_{a:.0%}_adoption_eur"] for r_ in summ.index for a in adopt]
     x = np.arange(len(adopt))
     for k, (region, col) in enumerate((("Netherlands", "#2a6fdb"), ("Limburg", "#1b9e5a"))):
-        v = [summ.loc[region, f"revenue_{a:.0%}_adoption_eur"] / 1e3 for a in adopt]
+        v = [summ.loc[region, f"revenue_{a:.0%}_adoption_eur"] for a in adopt]
         ax2.bar(x + (k - 0.5) * 0.38, v, 0.36, color=col, label=region)
         for xi, vi in zip(x + (k - 0.5) * 0.38, v, strict=True):
-            ax2.text(xi, vi, f"{vi:,.0f}", ha="center", va="bottom", fontsize=8)
+            ax2.text(
+                xi, vi, money_unit(allrev).fmt(vi, 0 if max(allrev) < 1e6 else 2), ha="center", va="bottom", fontsize=8
+            )
     ax2.set_xticks(x, [f"{a:.0%} subscribe" for a in adopt])
-    ax2.set_ylabel("Revenue, EUR k per year")
+    money_axis(ax2, allrev, "en", "y", "Revenue per year")
     r = _M["revenue"]
     ax2.set_title(f"How much: EUR {r['subscription_eur']:,}/yr + EUR {r['eur_per_gwh']}/GWh", fontsize=11)
     ax2.legend(frameon=False)

@@ -464,8 +464,15 @@ def plan_tracker(T: dict, lang: str) -> None:
     st.caption(T["tr_history"])
     if hpath.exists():
         h = pd.read_csv(hpath, comment="#")
-        h = h.set_index("run_date")[["bad_case_now", "bad_case_plan"]] / 1e6
-        st.line_chart(h.rename(columns={"bad_case_now": T["tr_now"], "bad_case_plan": T["tr_full"]}))
+        from hedgewise.moneyfmt import money_unit
+
+        h = h.set_index("run_date")[["bad_case_now", "bad_case_plan"]]
+        u = money_unit(h.values.ravel(), lang)  # the unit follows the size of the bill (EUR, k, m)
+        st.line_chart(
+            (h / u.div).rename(
+                columns={"bad_case_now": f"{T['tr_now']} ({u.label})", "bad_case_plan": f"{T['tr_full']} ({u.label})"}
+            )
+        )
     else:
         st.info(T["tr_no_history"])
     if st.button(T["tr_run"], key="tr_run_btn"):
