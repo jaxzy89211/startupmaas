@@ -15,13 +15,17 @@
   "buy_now_power": 0.15,
   "fixed_price_now": {
     "gas": 112.10723957061768,
-    "power": 223.1320089965485
+    "power": 223.13200899654856
   },
   "budget": null,
   "mode": "risk_aversion",
   "objective": "mean_variance",
   "anchor_scale": {
-    "gas": 0.742572976782243,
-    "power": 0.8970631515448247
+    "gas": 0.7425729771997434,
+    "power": 0.8970631478522441
+  },
+  "price_source": {
+    "gas": "proxy (30-day spot + 5%)",
+    "power": "proxy (30-day spot, seasonally adjusted + 5%)"
   }
 }

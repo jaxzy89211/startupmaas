@@ -31,6 +31,8 @@ Company: Limburg food processor (hypothetical) | gas 1,200,000 m3/yr (11,723 MWh
   2025: decision 2024-10-31 fitted+simulated in 0s | fixed price gas 42.6, power 94.3
   2025: decision 2024-11-30 fitted+simulated in 0s | fixed price gas 46.8, power 118.8
 
+Fixed prices: 0 from real forwards (no data/forwards.csv), 120 from the proxy (30-day spot + 5%).
+
 Realised annual bill, EUR k
                All variable  Fix 100% in Oct  Fix 60% at once (Jul)  Tranches 6x (100%)  Tranches 6x (60%)  Layered 2 years (40+40%)  HedgeWise policy (gamma 0.5)  HedgeWise (risk aversion 0.3)  HedgeWise (risk aversion 0.5)  HedgeWise (risk aversion 0.8)
 delivery_year                                                                                                                                                                                                                                                  

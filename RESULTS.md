@@ -1,4 +1,14 @@
-# HedgeWise: results on real data (v0.3, 23 Nov 2026)
+# HedgeWise: results on real data (v0.4, 23 Nov 2026)
+
+**v0.4 (for the 8 Dec Speeddate)** adds tools for real interviews; it does not change the model maths:
+- read real bills: any CSV or Excel export, Dutch formats, or yearly totals + sector
+- a one-page CFO report (PDF, English or Dutch)
+- a "what if 2022 happens again?" stress test
+- a capped, layered HedgeWise policy
+- a loader for real forward prices
+- Streamlit Cloud deployment prep
+
+The 2021–2025 backtest numbers below are **identical to v0.3** (rerun 23 Nov 2026). The only new column is the HedgeWise policy.
 
 Real Dutch day-ahead power and TTF gas prices, 2019 to today. Company: the hypothetical Limburg food processor (1.2m m³ gas + 5 GWh power a year). Commodity cost only. Reproduce with `python backtest.py` and `python hedgewise_model.py --as-of ...`.
 
@@ -66,13 +76,27 @@ The policy (`policy_plan` in `hedgewise_model.py`) takes the optimizer's target 
 
 Today's frontier: each extra 10% fixed costs about €10k on average and removes about €260k from the bad case. The exact recommended share moves by ±5 percentage points with the number of scenarios (2,000 in the dashboard vs 10,000 here).
 
+## Stress test: "what if 2022 happens again?" (new in v0.4)
+
+**A historical stress scenario, not a forecast.** For gas and power separately, take each month's realised 2022 average price divided by the H1 2021 average (gas ×5.7, power ×4.3 on a volume-weighted basis). Apply that ratio to today's fixed price. The hedged share is priced at today's fixed price. Hypothetical food processor, €m:
+
+| Decision date | All variable | HedgeWise plan | Fix 60% now | Fix 100% now |
+|---|---|---|---|---|
+| 30 Jun 2021 (plan: fix 70%) | 3.73 | 1.64 | 1.94 | 0.75 |
+| 30 Jun 2022 (plan: fix 90%) | 12.36 | 3.42 | 6.40 | 2.43 |
+| 23 Nov 2026, today (plan: fix 55%) | **10.76** | **6.01** | 5.57 | 2.12 |
+
+* This is a deliberately extreme scenario: it replays the *whole* 2021→2022 jump on top of today's prices, which are already high (gas fixed price ≈ €96/MWh). Present it as "this is what 2022 did to companies; here's how much of it your plan absorbs", not as a likely outcome.
+* By construction, fixing more always looks better in this scenario (prices only go up). The frontier and the backtest show the other side: the cost when prices fall, as in 2023.
+* It appears in the dashboard (bar chart + one sentence), in the PDF report (one line), and in `output/stress_<date>.png`.
+
 ## Calibration
 
 The realised 2021 and 2022 bills were above the model's 95th percentile (2 of 5 years outside the 5–95% range; a calibrated model would miss ~1 in 10). After the crisis the bands are very wide (2023 ES95 €7.7m against €0.99m realised). GARCH reacts to volatility after it has happened, so it is too calm before a crisis and too nervous after one. Next step: a stress scenario on top (for example "2022 repeats") and/or a regime-switching component.
 
 ## Limitations
 
-1. No real forward prices: the fixed price is 30-day spot (power seasonally adjusted) + 5%. The layered strategy uses the same proxy two years ahead, which is rougher still.
+1. No real forward prices yet: the fixed price is 30-day spot (power seasonally adjusted) + 5%. The layered strategy uses the same proxy two years ahead, which is rougher still. The loader is ready: put an EEX/ICE Endex export in `data/forwards.csv` and every number switches to real forwards (the backtest prints how many fixed prices came from each source).
 2. Commodity cost only; hypothetical company.
 3. The model is fat-tailed but backward-looking (see calibration).
 4. Five delivery years is a tiny sample: treat the backtest as an illustration, not proof.

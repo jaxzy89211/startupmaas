@@ -1,0 +1,21 @@
+Model fitted on data up to 2022-06-30 (1276 days)
+  gas   GARCH-t: alpha=0.196 beta=0.772 nu=4.6 | vol now 89%/yr, long-run 111%/yr | last price 144.5
+  power: log P = ... + 0.75*log gas | AR(1) phi=0.52, nu=2.8, R2=0.88 | last price 322.4
+  shock correlation: gas-power -0.18 
+
+                                            expected (kEUR)  p50 (kEUR)  var95 (kEUR)  es95 (kEUR)  worst (kEUR)  best (kEUR)  cost_at_risk (kEUR)
+All variable                                           2314        1865          5389         7962         30615          136                 5648
+Fix 60% now                                            2384        2204          3614         4643         13704         1512                 2259
+Fix 100% now                                           2430        2430          2430         2430          2430         2430                    0
+Tranches (6x, 100%)                                    2430        2345          3503         4081          9399          940                 1651
+HedgeWise (gas 90%, power 90%, 6 tranches)             2418        2314          3602         4283          9443          904                 1864 
+
+Fixed price available today: gas 112.1 EUR/MWh [proxy (30-day spot + 5%)], power 223.1 EUR/MWh [proxy (30-day spot, seasonally adjusted + 5%)]
+Delivery Jan 2023 - Dec 2023, Limburg food processor (hypothetical)
+If you stay fully variable: expected bill EUR 2.31m, but in the worst 5% of scenarios EUR 7.96m on average (worst simulated: EUR 30.62m).
+Recommendation (risk aversion 0.5): fix 90% of next year's gas and power, spread over 6 monthly tranches (2022-06, 2022-08, 2022-09, 2022-10, 2022-11, 2022-12); buy about 15% gas / 15% power this month.
+That cuts the bad-case bill (ES95) by EUR 3,679k for an expected extra cost of EUR 104k (the hedging premium).
+
+Historical stress scenario, not a forecast: if prices rose from today's level as much as they did from early 2021 to 2022 (gas ×5.7, power ×4.3), staying variable would cost €12.36m, the HedgeWise plan €3.42m and fixing 100% now €2.43m.
+
+Charts and tables written to /Users/brunokardas/hedgewise/output/  (analysis_2022-06-30.png, fit_2022-06-30.png)

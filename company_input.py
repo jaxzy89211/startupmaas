@@ -448,7 +448,7 @@ def company_from_args(args, verbose: bool = True) -> Company:
         res = from_yearly(args.yearly_gas or 0, args.gas_unit, args.yearly_power or 0, args.power_unit,
                           args.sector, args.name or f"{args.sector.title()} company")
     else:
-        return Company()
+        return Company(name=args.name) if args.name else Company()
     if verbose:
         print(describe(res))
         for w in res.warnings:
