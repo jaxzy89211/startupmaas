@@ -26,6 +26,31 @@ from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Tabl
 
 import hedgewise_model as hw
 
+# ---- Fonts: embed DejaVu Sans (ships with matplotlib, no download). The built-in Helvetica has no glyph for "³"
+# (m³ rendered as "m "), and an embedded TTF also looks the same in every PDF viewer.
+FONT, FONT_BOLD = "DejaVuSans", "DejaVuSans-Bold"
+
+
+def _register_fonts() -> None:
+    import matplotlib
+    from reportlab.lib.fonts import addMapping
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.ttfonts import TTFont
+    if FONT in pdfmetrics.getRegisteredFontNames():
+        return
+    d = Path(matplotlib.get_data_path()) / "fonts" / "ttf"
+    files = {FONT: "DejaVuSans.ttf", FONT_BOLD: "DejaVuSans-Bold.ttf",
+             "DejaVuSans-Oblique": "DejaVuSans-Oblique.ttf", "DejaVuSans-BoldOblique": "DejaVuSans-BoldOblique.ttf"}
+    for name, fn in files.items():
+        pdfmetrics.registerFont(TTFont(name, str(d / fn)))
+    # so that <b> / <i> inside Paragraphs use the matching DejaVu faces
+    for bold, italic, name in ((0, 0, FONT), (1, 0, FONT_BOLD), (0, 1, "DejaVuSans-Oblique"),
+                               (1, 1, "DejaVuSans-BoldOblique")):
+        addMapping(FONT, bold, italic, name)
+
+
+_register_fonts()
+
 BRAND = colors.HexColor("#1b9e5a")
 INK = colors.HexColor("#1f2937")
 MUTED = colors.HexColor("#6b7280")
@@ -125,14 +150,14 @@ def _num(x: float, lang: str, decimals: int = 0) -> str:
 def money(x: float, lang: str) -> str:
     """€2.07m / € 2,07 mln for millions; €25k / € 25.000 below."""
     if abs(x) >= 1e6:
-        return f"€{_num(x / 1e6, lang, 2)}m" if lang == "en" else f"€ {_num(x / 1e6, lang, 2)} mln"
+        return f"€{_num(x / 1e6, lang, 2)}m" if lang == "en" else f"€\u00a0{_num(x / 1e6, lang, 2)}\u00a0mln"
     if lang == "en":
         return f"€{_num(x / 1e3, lang, 0)}k"
-    return f"€ {_num(round(x, -3), lang, 0)}"
+    return f"€\u00a0{_num(round(x, -3), lang, 0)}"
 
 
 def _eur0(x: float, lang: str) -> str:
-    return f"€{x:,.0f}" if lang == "en" else f"€ {_num(x, lang)}"
+    return f"€{x:,.0f}" if lang == "en" else f"€\u00a0{_num(x, lang)}"
 
 
 def pct(x: float) -> str:
@@ -169,17 +194,17 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
     n_paths = len(next(iter(a.costs.values())))
 
     ss = {
-        "title": ParagraphStyle("title", fontName="Helvetica-Bold", fontSize=17, leading=21, textColor=INK,
+        "title": ParagraphStyle("title", fontName=FONT_BOLD, fontSize=17, leading=21, textColor=INK,
                                 spaceAfter=3),
-        "sub": ParagraphStyle("sub", fontName="Helvetica", fontSize=8.5, leading=11, textColor=MUTED),
-        "h": ParagraphStyle("h", fontName="Helvetica-Bold", fontSize=11, leading=14, textColor=BRAND,
+        "sub": ParagraphStyle("sub", fontName=FONT, fontSize=8.5, leading=11, textColor=MUTED),
+        "h": ParagraphStyle("h", fontName=FONT_BOLD, fontSize=11, leading=14, textColor=BRAND,
                             spaceBefore=7, spaceAfter=3),
-        "body": ParagraphStyle("body", fontName="Helvetica", fontSize=9.5, leading=13, textColor=INK),
-        "small": ParagraphStyle("small", fontName="Helvetica", fontSize=8, leading=10.5, textColor=MUTED),
-        "big": ParagraphStyle("big", fontName="Helvetica-Bold", fontSize=20, leading=24, textColor=INK),
-        "lbl": ParagraphStyle("lbl", fontName="Helvetica", fontSize=9.5, leading=12, textColor=INK),
-        "rec": ParagraphStyle("rec", fontName="Helvetica", fontSize=11, leading=15, textColor=INK),
-        "foot": ParagraphStyle("foot", fontName="Helvetica", fontSize=7, leading=9, textColor=MUTED,
+        "body": ParagraphStyle("body", fontName=FONT, fontSize=9.5, leading=13, textColor=INK),
+        "small": ParagraphStyle("small", fontName=FONT, fontSize=8, leading=10.5, textColor=MUTED),
+        "big": ParagraphStyle("big", fontName=FONT_BOLD, fontSize=20, leading=24, textColor=INK),
+        "lbl": ParagraphStyle("lbl", fontName=FONT, fontSize=9.5, leading=12, textColor=INK),
+        "rec": ParagraphStyle("rec", fontName=FONT, fontSize=11, leading=15, textColor=INK),
+        "foot": ParagraphStyle("foot", fontName=FONT, fontSize=7, leading=9, textColor=MUTED,
                                alignment=TA_LEFT),
     }
     W = A4[0] - 3.6 * cm
@@ -204,7 +229,7 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
              [Paragraph(money(var_row.expected, lang), ss["big"]),
               Paragraph(f"<font color='#b8433a'>{money(var_row.es95, lang)}</font>", ss["big"])]]
     tb = Table(cells, colWidths=[W / 2, W / 2])
-    tb.setStyle(TableStyle([("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f3f4f6")),
+    tb.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), FONT), ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f3f4f6")),
                             ("BACKGROUND", (1, 0), (1, -1), RED_SOFT),
                             ("VALIGN", (0, 0), (-1, -1), "TOP"),
                             ("LEFTPADDING", (0, 0), (-1, -1), 10), ("TOPPADDING", (0, 0), (-1, -1), 6),
@@ -253,7 +278,7 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
                 var=money(sc["bills"]["All variable"], lang), hw=money(sc["bills"]["HedgeWise"], lang)), ss["body"]))
         rec_parts.append(Paragraph(T["stress_note"], ss["small"]))
     box = Table([[rec_parts]], colWidths=[W])
-    box.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), SOFT),
+    box.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), FONT), ("BACKGROUND", (0, 0), (-1, -1), SOFT),
                              ("LINEBEFORE", (0, 0), (0, -1), 4, BRAND),
                              ("LEFTPADDING", (0, 0), (-1, -1), 12), ("RIGHTPADDING", (0, 0), (-1, -1), 10),
                              ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 9)]))
@@ -264,9 +289,9 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
         canv.setFillColor(BRAND)
         canv.rect(0, A4[1] - 1.1 * cm, A4[0], 1.1 * cm, fill=1, stroke=0)
         canv.setFillColor(colors.white)
-        canv.setFont("Helvetica-Bold", 13)
+        canv.setFont(FONT_BOLD, 13)
         canv.drawString(1.8 * cm, A4[1] - 0.75 * cm, "HedgeWise")
-        canv.setFont("Helvetica", 8.5)
+        canv.setFont(FONT, 8.5)
         canv.drawRightString(A4[0] - 1.8 * cm, A4[1] - 0.72 * cm, T["doc_title"])
         src = r.get("price_source", {})
         real = [v.split(" quoted")[0].replace("forward ", "") for v in src.values() if v.startswith("forward")]
