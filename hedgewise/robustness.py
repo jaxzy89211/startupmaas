@@ -248,9 +248,14 @@ def plot_robustness(summary: pd.DataFrame, per: pd.DataFrame, path: str) -> None
 
     fams = [f for f in ("model", "bootstrap") if f in set(summary.family)]
     fig, axes = plt.subplots(
-        1, len(fams) + 1, figsize=(7.2 * len(fams) + 6.5, 7), gridspec_kw={"width_ratios": [1] * len(fams) + [0.95]}
+        1, len(fams) + 1, figsize=(7.2 * len(fams) + 6.5, 8.2), gridspec_kw={"width_ratios": [1] * len(fams) + [0.95]}
     )
-    titles = {"model": "1,000 futures from the default model", "bootstrap": "1,000 futures from a block bootstrap"}
+    from matplotlib.ticker import FuncFormatter, LogLocator, NullFormatter
+
+    titles = {
+        "model": "{n:,} futures from the default model",
+        "bootstrap": "{n:,} futures from a block bootstrap\nWARNING: price paths fail the sanity check",
+    }
     for ax, fam in zip(axes, fams, strict=False):
         s = summary[summary.family == fam]
         for r in s.itertuples():
@@ -274,10 +279,14 @@ def plot_robustness(summary: pd.DataFrame, per: pd.DataFrame, path: str) -> None
         ax.set_xlabel("8-year total bill, EUR m (dot = median, whiskers = 5-95%)")
         ax.set_ylabel("Worst single year, EUR m (dot = median, whiskers = 5-95%)")
         ax.set_title(
-            f"{titles[fam]}\n(n = {int(s.n.iloc[0])}; legend: % of histories that beat all-variable)", fontsize=11
+            titles[fam].format(n=int(s.n.iloc[0])) + "\n(legend: % of histories that beat all-variable)", fontsize=10
         )
         ax.grid(alpha=0.25, which="both")
-        ax.legend(fontsize=7.5, frameon=False, loc="upper left")
+        for axis in (ax.xaxis, ax.yaxis):
+            axis.set_major_locator(LogLocator(subs=(1, 2, 5) if fam == "model" else (1,)))
+            axis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:,.0f}" if v >= 1 else f"{v:g}"))
+            axis.set_minor_formatter(NullFormatter())
+        ax.legend(fontsize=7.5, frameon=False, loc="upper center", bbox_to_anchor=(0.5, -0.12), ncol=2)
     ax = axes[-1]
     st = per[per.family == "stress"]
     names = list(dict.fromkeys(st.history))

@@ -12,6 +12,8 @@ python hedgewise_model.py          # today's view for next calendar year
 python backtest.py                 # strict 2021-2025 backtest + pitch chart
 python report.py --lang nl         # one-page PDF risk report for a CFO (EN or NL)
 python validation.py               # out-of-sample model validation (~1-2 min) -> METHODOLOGY.md
+python robustness.py --histories 200   # synthetic 8-year futures (~25 min on 4 cores; resumable, see below)
+python download_data.py --extended && python backtest.py --market DE-LU --years 2020 2021 2022 2023 2024 2025
 streamlit run app.py               # live demo dashboard in the browser
 python -m pytest -q --cov          # tests + coverage (pip install -r requirements-dev.txt)
 ruff check . && ruff format --check .   # lint
@@ -41,6 +43,7 @@ below works as before. When imported (`import backtest`, `import hedgewise_model
 | `hedgewise/company_input.py` | Real bills: any CSV/Excel export, Dutch formats, yearly totals + sector |
 | `hedgewise/forwards.py` | Real forward prices from `data/forwards.csv` (if present) |
 | `hedgewise/validation.py` | Out-of-sample validation: monthly forecasts from June 2020, coverage / Kupiec / Christoffersen / CRPS / pinball for 5 variants, pre-registered selection rule |
+| `hedgewise/robustness.py` | Strategies on synthetic 8-year futures (model, block bootstrap, 3 named stress paths). Runs in chunks of 20 histories, each saved to `output/robustness_chunks/` as soon as it finishes (git-ignored); rerunning the same command resumes, and at most 4 worker processes are used |
 | `hedgewise/provenance.py` | Writes config hash, data hashes and data date range into every output |
 | `hedgewise/settings.py`, `config.py`, `naming.py`, `cli.py`, `_types.py` | Settings from config, config loader, output names, model CLI, type aliases |
 | `hedgewise_model.py`, `backtest.py`, `report.py`, `company_input.py`, `forwards.py` | Thin wrappers (commands unchanged) |
