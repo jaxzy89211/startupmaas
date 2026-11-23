@@ -158,9 +158,14 @@ if stress:
     hw.plot_stress(stress, sbuf)
     sc1, sc2 = st.columns([3, 2])
     sc1.image(sbuf.getvalue(), width="stretch")
-    sc2.markdown(hw.stress_sentence(stress))
-    sc2.caption("A historical stress scenario, not a forecast: the monthly 2022 prices divided by the H1 2021 average, "
-                "applied to today's fixed price. The hedged share is priced at today's fixed price.")
+    for sc in stress["scenarios"]:
+        b, p = sc["bills"], sc["avg_price"]
+        sc2.markdown(f"**{sc['label']['en']}** (gas avg €{p['gas']:.0f}, power €{p['power']:.0f}/MWh): "
+                     f"all variable €{b['All variable']/1e6:.2f}m · HedgeWise plan €{b['HedgeWise']/1e6:.2f}m · "
+                     f"fix 100% €{b['Fix 100% now']/1e6:.2f}m")
+    sc2.caption("Historical stress scenarios, not forecasts. (a) The realised 2022 monthly prices exactly as they were. "
+                "(b) Today's fixed price × (2022 average / 2021 average) per commodity, with the 2022 monthly shape. "
+                "The hedged share is priced at today's fixed price.")
 
 st.subheader("Strategy comparison (EUR k)")
 st.dataframe((a.table / 1e3).round(0).astype(int), width="stretch")

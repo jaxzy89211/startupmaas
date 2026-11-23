@@ -583,83 +583,130 @@ def policy_plan(a: Analysis, months_ahead: int, prev_target: float | None = None
 
 
 # --------------------------------------------------------------------------------------------
-# Historical stress scenario: "what if 2022 happens again?"  (NOT a forecast)
+# Historical stress scenarios: "what if 2022 happens again?"  (NOT forecasts)
 # --------------------------------------------------------------------------------------------
-STRESS_BASE = ("2021-01-01", "2021-06-30")   # the calm before the crisis
 STRESS_YEAR = 2022
+STRESS_PREV_YEAR = 2021
+STRESS_KEYS = ["All variable", "HedgeWise", "Fix 60% now", "Fix 100% now"]
+STRESS_LABELS = {
+    "repeat": {"en": "2022 prices repeat", "nl": "Prijzen van 2022 herhalen zich"},
+    "shock": {"en": "A shock as big as 2021→2022, from today", "nl": "Een schok zo groot als 2021→2022, vanaf nu"},
+}
+
+
+def _stress_prices(df: pd.DataFrame) -> dict:
+    """Per commodity: realised 2022 monthly averages (calendar months 1-12) and the 2021 / 2022 annual averages."""
+    out = {}
+    for c in ("gas", "power"):
+        y22 = df.loc[f"{STRESS_YEAR}-01-01":f"{STRESS_YEAR}-12-31", c]
+        y21 = df.loc[f"{STRESS_PREV_YEAR}-01-01":f"{STRESS_PREV_YEAR}-12-31", c]
+        monthly = y22.groupby(y22.index.month).mean().reindex(range(1, 13))
+        if monthly.isna().any() or y21.empty:
+            raise ValueError(f"price data for all of {STRESS_PREV_YEAR} and {STRESS_YEAR} is needed for the stress test")
+        out[c] = {"monthly_2022": monthly.values, "avg_2021": float(y21.mean()), "avg_2022": float(y22.mean())}
+    return out
 
 
 def stress_test(a: Analysis, df: pd.DataFrame) -> dict:
-    """Replay the 2022 shock on today's price level.
+    """Two historical stress scenarios for next year's bill (NOT forecasts):
 
-    For gas and power separately: ratio[m] = realised average price in calendar month m of 2022 divided by the
-    average price of H1 2021. The stressed price for delivery month m = today's fixed price x ratio[m].
-    Bills for: all variable, the HedgeWise recommendation, fix 100% now, fix 60% now; the hedged part is
-    priced at today's fixed price. A historical stress scenario, not a forecast."""
+    (a) "repeat": the realised 2022 monthly gas and power prices exactly as they were.
+    (b) "shock" : a shock as big as 2021->2022, starting from today's level:
+                  price[m] = today's fixed price x (2022 annual avg / 2021 annual avg) x (2022 month m / 2022 annual avg)
+                  i.e. the 2022 monthly shape, scaled so the year averages fixed price x multiplier.
+    For each: bills for all variable, the HedgeWise recommendation, fix 60% now and fix 100% now; the hedged part
+    is priced at today's fixed price. Also the implied (volume-weighted) average gas and power price, so a reader
+    can sanity-check the scenario."""
     ds = a.delivery_start
-    order = [(ds + pd.DateOffset(months=i)).month for i in range(12)]           # calendar month per delivery month
-    vol = {"gas": a.company.gas_mwh[[m - 1 for m in order]], "power": a.company.power_mwh[[m - 1 for m in order]]}
-    out, ratios, stressed_avg = {}, {}, {}
-    var_cost, fix_cost = {}, {}
-    for c in ("gas", "power"):
-        base = df.loc[STRESS_BASE[0]:STRESS_BASE[1], c].mean()
-        y = df.loc[f"{STRESS_YEAR}-01-01":f"{STRESS_YEAR}-12-31", c]
-        monthly = y.groupby(y.index.month).mean().reindex(range(1, 13))
-        if not np.isfinite(base) or monthly.isna().any():
-            raise ValueError("price data for H1 2021 and all of 2022 is needed for the stress test")
-        r = (monthly / base).values
-        ratios[c] = r
-        stressed = a.fwd_now[c] * r[[m - 1 for m in order]]
-        var_cost[c] = float(vol[c] @ stressed)
-        fix_cost[c] = float(vol[c].sum() * a.fwd_now[c])
-        stressed_avg[c] = float(vol[c] @ stressed / vol[c].sum()) if vol[c].sum() else float(stressed.mean())
-
-    def bill(hg, hp):
-        return ((1 - hg) * var_cost["gas"] + hg * fix_cost["gas"]) + ((1 - hp) * var_cost["power"] + hp * fix_cost["power"])
-
+    cal = [(ds + pd.DateOffset(months=i)).month - 1 for i in range(12)]   # calendar-month index per delivery month
+    vol = {"gas": a.company.gas_mwh[cal], "power": a.company.power_mwh[cal]}
+    hp = _stress_prices(df)
     rec = a.recommendation
-    out = {"All variable": bill(0, 0), "HedgeWise": bill(rec["hedge_gas"], rec["hedge_power"]),
-           "Fix 100% now": bill(1, 1), "Fix 60% now": bill(0.6, 0.6)}
-    w = {c: float(vol[c] @ ratios[c][[m - 1 for m in order]] / vol[c].sum()) if vol[c].sum() else float("nan")
-         for c in vol}
-    return {**out, "multiplier": w, "stressed_avg_price": stressed_avg, "fixed_price": dict(a.fwd_now),
-            "hedge": rec["hedge_gas"], "label": f"{STRESS_YEAR} repeat (historical stress, not a forecast)"}
+    scenarios = []
+    for key in ("repeat", "shock"):
+        var_cost, fix_cost, avg, mult = {}, {}, {}, {}
+        for c in ("gas", "power"):
+            p22 = hp[c]["monthly_2022"][cal]
+            if key == "repeat":
+                prices = p22
+                mult[c] = None
+            else:
+                mult[c] = hp[c]["avg_2022"] / hp[c]["avg_2021"]
+                prices = a.fwd_now[c] * mult[c] * p22 / hp[c]["avg_2022"]
+            var_cost[c] = float(vol[c] @ prices)
+            fix_cost[c] = float(vol[c].sum() * a.fwd_now[c])
+            avg[c] = var_cost[c] / vol[c].sum() if vol[c].sum() else float(np.mean(prices))
+
+        def bill(h):
+            return sum((1 - h) * var_cost[c] + h * fix_cost[c] for c in ("gas", "power"))
+
+        bills = {"All variable": bill(0.0), "HedgeWise": bill(rec["hedge_gas"]),
+                 "Fix 60% now": bill(0.6), "Fix 100% now": bill(1.0)}
+        scenarios.append({"key": key, "label": STRESS_LABELS[key], "bills": bills, "avg_price": avg,
+                          "multiplier": mult})
+    return {"scenarios": scenarios, "hedge": rec["hedge_gas"], "fixed_price": dict(a.fwd_now),
+            "note": "historical stress scenarios, not forecasts"}
+
+
+def _eur_m(x: float, lang: str) -> str:
+    return f"€{x/1e6:.2f}m" if lang == "en" else f"€ {x/1e6:.2f} mln".replace(".", ",")
 
 
 def stress_sentence(s: dict, lang: str = "en") -> str:
-    g, p = s["multiplier"]["gas"], s["multiplier"]["power"]
-    if lang == "nl":
-        nl = lambda x: f"{x:.2f}".replace(".", ",")
-        gx, px = f"{g:.1f}".replace(".", ","), f"{p:.1f}".replace(".", ",")
-        return (f"Historisch stressscenario, geen voorspelling: als de prijzen vanaf vandaag net zo stijgen als van "
-                f"begin 2021 naar 2022 (gas ×{gx}, stroom ×{px}), kost variabel blijven "
-                f"€ {nl(s['All variable']/1e6)} mln, het HedgeWise-advies € {nl(s['HedgeWise']/1e6)} mln en "
-                f"100% vastzetten € {nl(s['Fix 100% now']/1e6)} mln.")
-    f = lambda x: f"€{x/1e6:.2f}m"
-    return (f"Historical stress scenario, not a forecast: if prices rose from today's level as much as they did from "
-            f"early 2021 to 2022 (gas ×{g:.1f}, power ×{p:.1f}), staying variable would cost {f(s['All variable'])}, "
-            f"the HedgeWise plan {f(s['HedgeWise'])} and fixing 100% now {f(s['Fix 100% now'])}.")
+    """One sentence per scenario, with the implied average prices."""
+    out = []
+    for sc in s["scenarios"]:
+        b, p = sc["bills"], sc["avg_price"]
+        if lang == "nl":
+            pr = f"gas gem. € {p['gas']:.0f}, stroom € {p['power']:.0f} per MWh"
+            out.append(f"{sc['label']['nl']} ({pr}): variabel {_eur_m(b['All variable'], lang)}, "
+                       f"HedgeWise-advies {_eur_m(b['HedgeWise'], lang)}, 100% vast {_eur_m(b['Fix 100% now'], lang)}.")
+        else:
+            pr = f"gas avg €{p['gas']:.0f}, power €{p['power']:.0f} per MWh"
+            out.append(f"{sc['label']['en']} ({pr}): all variable {_eur_m(b['All variable'], lang)}, "
+                       f"HedgeWise plan {_eur_m(b['HedgeWise'], lang)}, fix 100% {_eur_m(b['Fix 100% now'], lang)}.")
+    tail = ("Historical stress scenarios, not forecasts." if lang == "en"
+            else "Historische stressscenario's, geen voorspellingen.")
+    return " ".join(out) + " " + tail
 
 
-def plot_stress(s: dict, path=None, ax=None, lang: str = "en"):
+def plot_stress(s: dict, path=None, ax=None, lang: str = "en", compact: bool = False):
+    """Grouped bars: one group per scenario, one bar per strategy. compact=True for the PDF (smaller text)."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     own = ax is None
     if own:
-        fig, ax = plt.subplots(figsize=(8, 4))
-    keys = ["All variable", "HedgeWise", "Fix 60% now", "Fix 100% now"]
-    lbl = {"en": ["All variable", f"HedgeWise\n(fix {s['hedge']:.0%})", "Fix 60%\nnow", "Fix 100%\nnow"],
-           "nl": ["Alles variabel", f"HedgeWise\n({s['hedge']:.0%} vast)", "60% vast\nnu", "100% vast\nnu"]}[lang]
-    vals = [s[k] / 1e6 for k in keys]
-    bars = ax.bar(lbl, vals, color=["#b8433a", "#1b9e5a", "#2a6fdb", "#6b7280"], width=0.6)
-    for b, v in zip(bars, vals):
-        txt = f"€{v:.2f}m" if lang == "en" else f"€ {v:.2f} mln".replace(".", ",")
-        ax.text(b.get_x() + b.get_width() / 2, v, txt, ha="center", va="bottom", fontsize=10, weight="bold")
-    ax.set_ylim(0, max(vals) * 1.15)
-    ax.set_ylabel("€ m" if lang == "en" else "€ mln")
-    ax.set_title("What if 2022 happens again? (historical stress, not a forecast)" if lang == "en"
-                 else "Wat als 2022 zich herhaalt? (historisch stressscenario, geen voorspelling)", fontsize=11)
+        fig, ax = plt.subplots(figsize=(9, 4.2))
+    names = {"en": ["All variable", f"HedgeWise (fix {s['hedge']:.0%})", "Fix 60% now", "Fix 100% now"],
+             "nl": ["Alles variabel", f"HedgeWise ({s['hedge']:.0%} vast)", "60% vast nu", "100% vast nu"]}[lang]
+    colors = ["#b8433a", "#1b9e5a", "#2a6fdb", "#6b7280"]
+    scs = s["scenarios"]
+    w = 0.2
+    fs = 7 if compact else 9
+    top = max(v for sc in scs for v in sc["bills"].values()) / 1e6
+    for j, key in enumerate(STRESS_KEYS):
+        xs = np.arange(len(scs)) + (j - 1.5) * w
+        vals = [sc["bills"][key] / 1e6 for sc in scs]
+        ax.bar(xs, vals, w * 0.92, color=colors[j], label=names[j])
+        for x, v in zip(xs, vals):
+            t = f"{v:.2f}" if lang == "en" else f"{v:.2f}".replace(".", ",")
+            ax.text(x, v + top * 0.015, t, ha="center", va="bottom", fontsize=fs - 0.5)
+    ticks = []
+    for sc in scs:
+        p = sc["avg_price"]
+        if lang == "en":
+            ticks.append(f"{sc['label']['en']}\n(gas avg €{p['gas']:.0f}, power €{p['power']:.0f}/MWh)")
+        else:
+            ticks.append(f"{sc['label']['nl']}\n(gas gem. € {p['gas']:.0f}, stroom € {p['power']:.0f}/MWh)")
+    ax.set_xticks(np.arange(len(scs)), ticks, fontsize=fs)
+    ax.set_ylim(0, top * 1.22)
+    ax.set_ylabel("€ m" if lang == "en" else "€ mln", fontsize=fs)
+    ax.tick_params(axis="y", labelsize=fs)
+    ax.legend(fontsize=fs - 0.5, frameon=False, ncol=4 if not compact else 2, loc="upper center")
+    if not compact:
+        ax.set_title("What if 2022 happens again? (historical stress scenarios, not forecasts)" if lang == "en"
+                     else "Wat als 2022 zich herhaalt? (historische stressscenario's, geen voorspellingen)", fontsize=11)
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="y", alpha=0.25)
     if own:
@@ -899,7 +946,13 @@ def main(argv=None):
     print(recommendation_text(a))
     if not args.demo:
         st_ = stress_test(a, df)
-        print("\n" + stress_sentence(st_))
+        print("\nStress scenarios (historical, NOT forecasts), EUR k:")
+        for sc in st_["scenarios"]:
+            p = sc["avg_price"]
+            mult = (f", multiplier gas x{sc['multiplier']['gas']:.2f}, power x{sc['multiplier']['power']:.2f}"
+                    if sc["multiplier"]["gas"] else "")
+            print(f"  {sc['label']['en']}: implied average price gas {p['gas']:.0f}, power {p['power']:.0f} EUR/MWh{mult}")
+            print("    " + " | ".join(f"{k} {v/1e3:,.0f}" for k, v in sc["bills"].items()))
     tag = ("demo_" if args.demo else "") + f"{m.as_of:%Y-%m-%d}"
     plot_analysis(a, OUT / f"analysis_{tag}.png")
     plot_fit(m, OUT / f"fit_{tag}.png")

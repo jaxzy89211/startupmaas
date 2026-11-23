@@ -54,9 +54,10 @@ TEXT = {
         "rec_effect": "With this plan: expected bill {e}, bad case {es} (instead of {es0}).",
         "tradeoff": "Each extra 10% fixed costs about <b>{a}</b> on average and removes about <b>{b}</b> "
                     "from the bad case.",
-        "stress": "<b>What if 2022 happens again?</b> If prices rose from today's level as much as they did from "
-                  "early 2021 to 2022, staying variable would cost {var}; with our recommendation {hw}. "
-                  "(A historical stress scenario, not a forecast.)",
+        "stress_h": "What if 2022 happens again?",
+        "stress_sc": "<b>{label}</b> (gas avg {gas}, power {power} per MWh): staying variable {var}; "
+                     "with our recommendation {hw}.",
+        "stress_note": "Historical stress scenarios, not forecasts. The fixed share is priced at today's fixed price.",
         "footer": "<b>HedgeWise</b> · Assumptions: commodity cost only (no network tariffs, energy tax or supplier "
                   "margin); {fixed}; volumes are "
                   "taken as known. Scenarios come from a statistical model of past prices and can miss events "
@@ -87,9 +88,10 @@ TEXT = {
         "rec_effect": "Met dit plan: verwachte rekening {e}, slecht scenario {es} (in plaats van {es0}).",
         "tradeoff": "Elke extra 10% vastzetten kost gemiddeld ongeveer <b>{a}</b> en haalt ongeveer <b>{b}</b> "
                     "van het slechte scenario af.",
-        "stress": "<b>Wat als 2022 zich herhaalt?</b> Als de prijzen vanaf vandaag net zo stijgen als van begin "
-                  "2021 naar 2022, kost variabel blijven {var}; met ons advies {hw}. "
-                  "(Een historisch stressscenario, geen voorspelling.)",
+        "stress_h": "Wat als 2022 zich herhaalt?",
+        "stress_sc": "<b>{label}</b> (gas gem. {gas}, stroom {power} per MWh): variabel blijven {var}; "
+                     "met ons advies {hw}.",
+        "stress_note": "Historische stressscenario's, geen voorspellingen. Het vaste deel tegen de vaste prijs van nu.",
         "footer": "<b>HedgeWise</b> · Aannames: alleen de kosten van de energie zelf (geen netbeheerkosten, "
                   "energiebelasting of leveranciersmarge); {fixed}; het verbruik wordt als bekend aangenomen. De scenario's komen uit een "
                   "statistisch model van prijzen uit het verleden en kunnen gebeurtenissen missen die nog nooit "
@@ -127,6 +129,10 @@ def money(x: float, lang: str) -> str:
     if lang == "en":
         return f"€{_num(x / 1e3, lang, 0)}k"
     return f"€ {_num(round(x, -3), lang, 0)}"
+
+
+def _eur0(x: float, lang: str) -> str:
+    return f"€{x:,.0f}" if lang == "en" else f"€ {_num(x, lang)}"
 
 
 def pct(x: float) -> str:
@@ -239,8 +245,13 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
                  Paragraph(T["tradeoff"].format(a=money(d_e, lang), b=money(d_es, lang)), ss["body"])]
     if stress:
         rec_parts.append(Spacer(1, 3))
-        rec_parts.append(Paragraph(T["stress"].format(var=money(stress["All variable"], lang),
-                                                      hw=money(stress["HedgeWise"], lang)), ss["body"]))
+        rec_parts.append(Paragraph(f"<b>{T['stress_h']}</b>", ss["body"]))
+        for sc in stress["scenarios"]:
+            p = sc["avg_price"]
+            rec_parts.append(Paragraph(T["stress_sc"].format(
+                label=sc["label"][lang], gas=_eur0(p["gas"], lang), power=_eur0(p["power"], lang),
+                var=money(sc["bills"]["All variable"], lang), hw=money(sc["bills"]["HedgeWise"], lang)), ss["body"]))
+        rec_parts.append(Paragraph(T["stress_note"], ss["small"]))
     box = Table([[rec_parts]], colWidths=[W])
     box.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, -1), SOFT),
                              ("LINEBEFORE", (0, 0), (0, -1), 4, BRAND),

@@ -76,19 +76,28 @@ The policy (`policy_plan` in `hedgewise_model.py`) takes the optimizer's target 
 
 Today's frontier: each extra 10% fixed costs about €10k on average and removes about €260k from the bad case. The exact recommended share moves by ±5 percentage points with the number of scenarios (2,000 in the dashboard vs 10,000 here).
 
-## Stress test: "what if 2022 happens again?" (new in v0.4)
+## Stress test: "what if 2022 happens again?" (two scenarios, revised)
 
-**A historical stress scenario, not a forecast.** For gas and power separately, take each month's realised 2022 average price divided by the H1 2021 average (gas ×5.7, power ×4.3 on a volume-weighted basis). Apply that ratio to today's fixed price. The hedged share is priced at today's fixed price. Hypothetical food processor, €m:
+**Historical stress scenarios, not forecasts.** The v0.4 scenario applied the 2022/H1-2021 ratios to today's level. That implied gas at about €550/MWh for a whole year, which isn't credible, so it has been replaced by two scenarios:
 
-| Decision date | All variable | HedgeWise plan | Fix 60% now | Fix 100% now |
-|---|---|---|---|---|
-| 30 Jun 2021 (plan: fix 70%) | 3.73 | 1.64 | 1.94 | 0.75 |
-| 30 Jun 2022 (plan: fix 90%) | 12.36 | 3.42 | 6.40 | 2.43 |
-| 23 Nov 2026, today (plan: fix 55%) | **10.76** | **6.01** | 5.57 | 2.12 |
+* **(a) 2022 prices repeat:** the realised 2022 monthly gas and power prices, exactly as they were.
+* **(b) A shock as big as 2021→2022, from today:** today's fixed price × (2022 annual average / 2021 annual average), with the 2022 monthly shape. The multipliers are gas ×2.81 (€47.1 → €132.1) and power ×2.35 (€103.0 → €241.9).
 
-* This is a deliberately extreme scenario: it replays the *whole* 2021→2022 jump on top of today's prices, which are already high (gas fixed price ≈ €96/MWh). Present it as "this is what 2022 did to companies; here's how much of it your plan absorbs", not as a likely outcome.
-* By construction, fixing more always looks better in this scenario (prices only go up). The frontier and the backtest show the other side: the cost when prices fall, as in 2023.
-* It appears in the dashboard (bar chart + one sentence), in the PDF report (one line), and in `output/stress_<date>.png`.
+The fixed share is priced at today's fixed price. "Implied avg" is the volume-weighted average price the company would pay if it stayed variable. Hypothetical food processor, €m:
+
+| Decision date (plan) | Scenario | Implied avg gas / power (€/MWh) | All variable | HedgeWise plan | Fix 60% now | Fix 100% now |
+|---|---|---|---|---|---|---|
+| 30 Jun 2021 (fix 70%) | 2022 repeats | 124 / 243 | 2.67 | 1.32 | 1.52 | 0.75 |
+| | shock from today | 80 / 183 | 1.86 | 1.08 | 1.19 | 0.75 |
+| 30 Jun 2022 (fix 90%) | 2022 repeats | 124 / 243 | 2.67 | 2.45 | 2.53 | 2.43 |
+| | shock from today | 295 / 527 | 6.10 | 2.80 | 3.90 | 2.43 |
+| **23 Nov 2026, today (fix 55%)** | 2022 repeats | 124 / 243 | **2.67** | **2.37** | 2.34 | 2.12 |
+| | shock from today | 253 / 471 | **5.32** | **3.56** | 3.40 | 2.12 |
+
+* Sanity check: as of 30 Jun 2021, "2022 repeats" is what actually happened, and its all-variable bill (€2.67m) equals the realised 2022 bill in the backtest.
+* Today's fixed prices (gas €96, power €199/MWh) are already close to the 2022 averages, so "2022 repeats" adds only about €0.65m to a variable bill. The shock scenario is the one that hurts: €5.32m variable vs €3.56m with the plan.
+* By construction, fixing more always looks better in a price-rise scenario. The frontier and the backtest show the other side (2023, when prices fell).
+* It appears in the dashboard, the PDF and the CLI (with the implied prices), and in `output/stress_<date>.png`.
 
 ## Calibration
 

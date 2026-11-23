@@ -1,4 +1,4 @@
-"""Sanity checks for the 'what if 2022 happens again' stress test."""
+"""Sanity checks for the two historical stress scenarios (2022 repeat; 2021->2022-sized shock from today)."""
 import sys
 from pathlib import Path
 
@@ -17,21 +17,47 @@ def setup():
     return df, a, hw.stress_test(a, df)
 
 
-def test_fix_100_is_todays_fixed_price(setup):
+def _sc(s, key):
+    return next(x for x in s["scenarios"] if x["key"] == key)
+
+
+def test_repeat_uses_realised_2022_prices(setup):
+    df, a, s = setup
+    rep = _sc(s, "repeat")
+    y = df.loc["2022", "gas"]
+    monthly = y.groupby(y.index.month).mean().values
+    v = a.company.gas_mwh
+    assert rep["avg_price"]["gas"] == pytest.approx(float(v @ monthly / v.sum()))
+    assert 100 < rep["avg_price"]["gas"] < 150 and 200 < rep["avg_price"]["power"] < 290   # 2022 levels
+
+
+def test_shock_multiplier_is_2022_over_2021_annual_average(setup):
+    df, a, s = setup
+    sh = _sc(s, "shock")
+    for c in ("gas", "power"):
+        expect = df.loc["2022", c].mean() / df.loc["2021", c].mean()
+        assert sh["multiplier"][c] == pytest.approx(expect)
+    # with a flat consumption profile the implied average would be exactly fixed price x multiplier;
+    # with the real (seasonal) profile it stays within 15% of that
+    for c in ("gas", "power"):
+        assert sh["avg_price"][c] == pytest.approx(a.fwd_now[c] * sh["multiplier"][c], rel=0.15)
+
+
+def test_bills_consistent(setup):
     _, a, s = setup
     fixed = a.company.gas_mwh.sum() * a.fwd_now["gas"] + a.company.power_mwh.sum() * a.fwd_now["power"]
-    assert s["Fix 100% now"] == pytest.approx(fixed)
+    h = s["hedge"]
+    for sc in s["scenarios"]:
+        b = sc["bills"]
+        assert b["Fix 100% now"] == pytest.approx(fixed)
+        assert b["HedgeWise"] == pytest.approx((1 - h) * b["All variable"] + h * b["Fix 100% now"])
+        assert b["Fix 60% now"] == pytest.approx(0.4 * b["All variable"] + 0.6 * b["Fix 100% now"])
+    sh = _sc(s, "shock")["bills"]
+    assert sh["All variable"] > sh["Fix 60% now"] > sh["Fix 100% now"]      # a shock raises prices
 
 
-def test_ordering_and_linearity(setup):
-    _, a, s = setup
-    assert s["multiplier"]["gas"] > 1 and s["multiplier"]["power"] > 1       # 2022 was far above H1 2021
-    assert s["All variable"] > s["Fix 60% now"] > s["Fix 100% now"]
-    h = a.recommendation["hedge_gas"]
-    assert s["HedgeWise"] == pytest.approx((1 - h) * s["All variable"] + h * s["Fix 100% now"])
-
-
-def test_sentences_say_not_a_forecast(setup):
+def test_sentences_say_not_a_forecast_and_show_prices(setup):
     _, _, s = setup
-    assert "not a forecast" in hw.stress_sentence(s, "en")
-    assert "geen voorspelling" in hw.stress_sentence(s, "nl")
+    en, nl = hw.stress_sentence(s, "en"), hw.stress_sentence(s, "nl")
+    assert "not forecasts" in en and "geen voorspellingen" in nl
+    assert "per MWh" in en and "per MWh" in nl
