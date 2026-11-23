@@ -1,4 +1,4 @@
-# hedgewise_version: "0.5.0"
+# hedgewise_version: "0.7.0"
 # config_file: "config.yaml"
 # config_hash: "9cbfbda9d6dc"
 sector,size_class,companies_nl,limburg_share,companies_limburg,sector_gas_gwh,sector_power_gwh,persons,persons_source,gwh_per_person,avg_gwh_per_company,target,gas_share,avg_spend_eur

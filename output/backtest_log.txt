@@ -1,6 +1,6 @@
 Company: Limburg food processor (hypothetical) | gas 1,200,000 m3/yr (11,723 MWh), power 5,000 MWh/yr
 
-  2021: decision 2020-06-30 fitted+simulated in 0s | fixed price gas 5.6, power 26.2
+  2021: decision 2020-06-30 fitted+simulated in 1s | fixed price gas 5.6, power 26.2
   2021: decision 2020-07-31 fitted+simulated in 0s | fixed price gas 5.6, power 28.5
   2021: decision 2020-08-31 fitted+simulated in 0s | fixed price gas 8.7, power 32.9
   2021: decision 2020-09-30 fitted+simulated in 0s | fixed price gas 12.0, power 41.0
@@ -12,13 +12,13 @@ Company: Limburg food processor (hypothetical) | gas 1,200,000 m3/yr (11,723 MWh
   2022: decision 2021-09-30 fitted+simulated in 0s | fixed price gas 68.1, power 132.3
   2022: decision 2021-10-31 fitted+simulated in 0s | fixed price gas 93.7, power 160.4
   2022: decision 2021-11-30 fitted+simulated in 0s | fixed price gas 86.3, power 185.1
-  2023: decision 2022-06-30 fitted+simulated in 0s | fixed price gas 112.1, power 223.1
-  2023: decision 2022-07-31 fitted+simulated in 0s | fixed price gas 179.0, power 327.5
+  2023: decision 2022-06-30 fitted+simulated in 1s | fixed price gas 112.1, power 223.1
+  2023: decision 2022-07-31 fitted+simulated in 1s | fixed price gas 179.0, power 327.5
   2023: decision 2022-08-31 fitted+simulated in 0s | fixed price gas 251.9, power 478.3
   2023: decision 2022-09-30 fitted+simulated in 0s | fixed price gas 211.3, power 367.2
   2023: decision 2022-10-31 fitted+simulated in 0s | fixed price gas 142.9, power 169.6
   2023: decision 2022-11-30 fitted+simulated in 0s | fixed price gas 123.9, power 194.9
-  2024: decision 2023-06-30 fitted+simulated in 0s | fixed price gas 33.7, power 93.3
+  2024: decision 2023-06-30 fitted+simulated in 1s | fixed price gas 33.7, power 93.3
   2024: decision 2023-07-31 fitted+simulated in 0s | fixed price gas 30.8, power 77.0
   2024: decision 2023-08-31 fitted+simulated in 0s | fixed price gas 36.7, power 99.4
   2024: decision 2023-09-30 fitted+simulated in 0s | fixed price gas 38.9, power 108.0
@@ -26,10 +26,11 @@ Company: Limburg food processor (hypothetical) | gas 1,200,000 m3/yr (11,723 MWh
   2024: decision 2023-11-30 fitted+simulated in 0s | fixed price gas 48.3, power 107.6
   2025: decision 2024-06-30 fitted+simulated in 0s | fixed price gas 36.1, power 68.0
   2025: decision 2024-07-31 fitted+simulated in 0s | fixed price gas 34.1, power 67.2
-  2025: decision 2024-08-31 fitted+simulated in 0s | fixed price gas 40.4, power 83.2
-  2025: decision 2024-09-30 fitted+simulated in 0s | fixed price gas 38.2, power 84.7
-  2025: decision 2024-10-31 fitted+simulated in 0s | fixed price gas 42.6, power 94.3
-  2025: decision 2024-11-30 fitted+simulated in 0s | fixed price gas 46.8, power 118.8
+  2025: decision 2024-08-31 fitted+simulated in 1s | fixed price gas 40.4, power 83.2
+  2025: decision 2024-09-30 fitted+simulated in 1s | fixed price gas 38.2, power 84.7
+  2025: decision 2024-10-31 fitted+simulated in 1s | fixed price gas 42.6, power 94.3
+  2025: decision 2024-11-30 fitted+simulated in 1s | fixed price gas 46.8, power 118.8
+Provenance: config 9cbfbda9d6dc · data 8181ab654204 (2019-01-02..2026-11-23) · v0.7.0
 
 Fixed prices: 0 from real forwards (no data/forwards.csv), 120 from the proxy (30-day spot + 5%).
 
@@ -85,4 +86,4 @@ Model forecast of the all-variable bill (as of 30 Jun of the year before) vs rea
   Coverage: 2 of 5 years outside the 5-95% range (a calibrated model: ~10%).
 
 HEADLINE: in 2022 an unhedged Limburg food processor (hypothetical) paid EUR 2.67m; fixing in 6 monthly tranches it would have paid EUR 1.31m (saving EUR 1.36m, 51%). HedgeWise optimiser (risk aversion 0.5): EUR 1.89m.
-Charts: /Users/brunokardas/hedgewise/output/pitch_2022.png, pitch_cycle.png, backtest_all_years.png, backtest_calibration.png
+Charts: /Users/brunokardas/hedgewise/output/pitch_2022.png, pitch_cycle.png, backtest_all_years.png, ...

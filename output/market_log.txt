@@ -1,0 +1,45 @@
+Sources: data/cbs/81589NED.csv; data/cbs/81578NED.csv; data/cbs/83583NED.csv; data/cbs/83989NED.csv
+                                                           sector size_class  companies_nl  companies_limburg  avg_gwh_per_company  target
+                                       Food and drink (SBI 10-12)      10-20           470               27.3                 2.13    True
+                                       Food and drink (SBI 10-12)      20-50           365               21.2                 4.86    True
+                                       Food and drink (SBI 10-12)     50-100           180               10.5                10.64    True
+                                       Food and drink (SBI 10-12)    100-250           160                9.3                23.55    True
+                                                   Paper (SBI 17)      10-20            35                2.7                 3.80    True
+                                                   Paper (SBI 17)      20-50            45                3.5                 8.69    True
+                                                   Paper (SBI 17)     50-100            25                1.9                19.01    True
+                                                   Paper (SBI 17)    100-250            30                2.3                42.10    True
+                                               Chemicals (SBI 20)      10-20            70                6.5                10.02    True
+                                               Chemicals (SBI 20)      20-50           105                9.8                22.90    True
+                                               Chemicals (SBI 20)     50-100            60                5.6                50.10    True
+                                               Chemicals (SBI 20)    100-250            50                4.7               110.94    True
+                                     Rubber and plastics (SBI 22)      10-20           135               11.2                 0.95   False
+                                     Rubber and plastics (SBI 22)      20-50           135               11.2                 2.17    True
+                                     Rubber and plastics (SBI 22)     50-100            90                7.5                 4.74    True
+                                     Rubber and plastics (SBI 22)    100-250            70                5.8                10.50    True
+                       Glass, ceramics, cement, concrete (SBI 23)      10-20           100                8.2                 3.39    True
+                       Glass, ceramics, cement, concrete (SBI 23)      20-50            70                5.8                 7.75    True
+                       Glass, ceramics, cement, concrete (SBI 23)     50-100            35                2.9                16.94    True
+                       Glass, ceramics, cement, concrete (SBI 23)    100-250            30                2.5                37.52    True
+                                            Basic metals (SBI 24)      10-20            15                1.1                 4.10    True
+                                            Basic metals (SBI 24)      20-50            35                2.6                 9.38    True
+                                            Basic metals (SBI 24)     50-100            15                1.1                20.52    True
+                                            Basic metals (SBI 24)    100-250            15                1.1                45.44    True
+                                          Metal products (SBI 25)      10-20           680               41.0                 0.47   False
+                                          Metal products (SBI 25)      20-50           605               36.5                 1.07    True
+                                          Metal products (SBI 25)     50-100           200               12.1                 2.34    True
+                                          Metal products (SBI 25)    100-250           110                6.6                 5.17    True
+Greenhouse horticulture (SBI 0113x/0119x/0125x/0130x under glass)      10-20           235               16.4                18.23    True
+Greenhouse horticulture (SBI 0113x/0119x/0125x/0130x under glass)      20-50           205               14.3                41.66    True
+Greenhouse horticulture (SBI 0113x/0119x/0125x/0130x under glass)     50-100            45                3.1                91.14    True
+Greenhouse horticulture (SBI 0113x/0119x/0125x/0130x under glass)    100-250            15                1.0               201.80    True
+
+region                         Netherlands      Limburg
+all_10_250_in_these_sectors   4.435000e+03        297.0
+target_companies              3.620000e+03        245.0
+energy_use_gwh                4.944700e+04       3687.0
+energy_spend_eur              2.431028e+09  181481274.0
+revenue_if_all_subscribe_eur  1.827711e+07    1288525.0
+revenue_1%_adoption_eur       1.827710e+05      12885.0
+revenue_5%_adoption_eur       9.138560e+05      64426.0
+revenue_10%_adoption_eur      1.827711e+06     128853.0
+Provenance: config 9cbfbda9d6dc · v0.7.0

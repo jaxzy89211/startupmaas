@@ -1,4 +1,4 @@
-# hedgewise_version: "0.5.0"
+# hedgewise_version: "0.7.0"
 # config_file: "config.yaml"
 # config_hash: "9cbfbda9d6dc"
 region,all_10_250_in_these_sectors,target_companies,energy_use_gwh,energy_spend_eur,revenue_if_all_subscribe_eur,revenue_1%_adoption_eur,revenue_5%_adoption_eur,revenue_10%_adoption_eur

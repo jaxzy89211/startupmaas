@@ -1,6 +1,6 @@
-# hedgewise_version: "0.5.0"
+# hedgewise_version: "0.7.0"
 # config_file: "config.yaml"
-# config_hash: "2d2e0be3ca51"
+# config_hash: "9cbfbda9d6dc"
 # data_hash: "8181ab654204"
 # data_files: {"gas_ttf.csv": "eb651645abc9", "power_nl_daily.csv": "d15cd68d0cd3"}
 # data_from: "2019-01-02"
