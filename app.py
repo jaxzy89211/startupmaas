@@ -11,6 +11,7 @@ import streamlit as st
 
 import company_input as ci
 import hedgewise_model as hw
+import report
 
 st.set_page_config(page_title="HedgeWise", page_icon="⚡", layout="wide")
 
@@ -122,6 +123,7 @@ with st.spinner("Fitting GARCH-t model and simulating price scenarios ..."):
     a = hw.analyse(m, company, ds, n, 42, lam, sims=s, allow_timing=allow_timing, budget=budget)
 
 var_row, hw_row = a.table.loc["All variable"], a.table.iloc[-1]
+stress = None
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Expected bill, all variable", f"€{var_row.expected/1e6:.2f}m")
 c2.metric("Bad case (avg worst 5%), all variable", f"€{var_row.es95/1e6:.2f}m")
@@ -131,6 +133,16 @@ rg, rp = a.recommendation['hedge_gas'], a.recommendation['hedge_power']
 c4.metric("Recommended share to fix", f"{rg:.0%}" if np.isclose(rg, rp) else f"gas {rg:.0%} · power {rp:.0%}")
 
 st.info(hw.recommendation_text(a).replace("\n", "  \n"))
+
+rc1, rc2, _ = st.columns([1, 2, 3])
+rep_lang = rc1.radio("Report language", ["EN", "NL"], horizontal=True)
+pdf = io.BytesIO()
+try:
+    report.make_report(a, pdf, rep_lang.lower(), stress=stress)
+    rc2.download_button("Download report (PDF)", pdf.getvalue(), type="primary",
+                        file_name=report.report_path(company.name, m.as_of).name, mime="application/pdf")
+except Exception as e:  # noqa: BLE001  (never let the report break the demo)
+    rc2.error(f"Report could not be made: {e}")
 
 buf = io.BytesIO()          # in memory: no shared file when several people use the demo at once
 hw.plot_analysis(a, buf)

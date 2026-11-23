@@ -621,12 +621,26 @@ def plot_analysis(a: Analysis, path: Path):
     plt.close(fig)
 
 
-def plot_frontier(a: Analysis, ax=None, path: Path | None = None):
+FRONTIER_TEXT_EN = {
+    "title": "Pick your trade-off: share of next year's energy fixed",
+    "xlabel": "Bad-case bill: average of worst 5% of scenarios (EUR m)",
+    "ylabel": "Expected bill (EUR m)",
+    "pick": "HedgeWise pick: fix {h} (risk aversion {g})",
+    "pick_budget": "HedgeWise pick: fix {h} (budget)",
+    "tradeoff": "Each extra 10% fixed: about EUR {e}k more on average,\nEUR {es}k less in the bad case",
+    "decimal": ".",
+}
+
+
+def plot_frontier(a: Analysis, ax=None, path=None, text: dict | None = None, show_tradeoff: bool = True):
     """Efficient frontier: expected bill vs bad-case bill (ES95) for one hedge ratio 0-100% (gas and power),
-    executed the recommended way. The CFO picks a point; HedgeWise marks the one for their risk appetite."""
+    executed the recommended way. The CFO picks a point; HedgeWise marks the one for their risk appetite.
+    `text` overrides the labels (e.g. Dutch, see report.py); `path` may be a file path or a binary buffer."""
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+    from matplotlib.ticker import FuncFormatter
+    tx = {**FRONTIER_TEXT_EN, **(text or {})}
     own = ax is None
     if own:
         fig, ax = plt.subplots(figsize=(8, 5.5))
@@ -643,23 +657,29 @@ def plot_frontier(a: Analysis, ax=None, path: Path | None = None):
                         xytext=(4, 6), fontsize=9, color="#1e3a8a")
     rec = f[np.isclose(f.hedge_gas, r["hedge_gas"])]
     if len(rec):
-        ax.plot(rec.es95.iloc[0] / 1e6, rec.expected.iloc[0] / 1e6, "*", ms=18, color="#1b9e5a", zorder=4,
-                label=f"HedgeWise pick: fix {r['hedge_gas']:.0%} (risk aversion {r['risk_aversion']})"
-                if r["mode"] != "budget" else f"HedgeWise pick: fix {r['hedge_gas']:.0%} (budget)")
-    if len(f) > 2:
+        h_txt = f"{r['hedge_gas']:.0%}"
+        lbl = (tx["pick_budget"] if r["mode"] == "budget" else tx["pick"]).format(
+            h=h_txt, g=str(r["risk_aversion"]).replace(".", tx["decimal"]))
+        ax.plot(rec.es95.iloc[0] / 1e6, rec.expected.iloc[0] / 1e6, "*", ms=18, color="#1b9e5a", zorder=4, label=lbl)
+    if show_tradeoff and len(f) > 2:
         lo, hi = f.iloc[0], f.iloc[-1]
         d_e = (hi.expected - lo.expected) / 10 / 1e3
         d_es = (lo.es95 - hi.es95) / 10 / 1e3
-        ax.text(0.03, 0.05, f"Each extra 10% fixed: about EUR {d_e:,.0f}k more on average,\n"
-                f"EUR {d_es:,.0f}k less in the bad case", transform=ax.transAxes, fontsize=9, color="#333")
-    ax.set_xlabel("Bad-case bill: average of worst 5% of scenarios (EUR m)")
-    ax.set_ylabel("Expected bill (EUR m)")
-    ax.set_title("Pick your trade-off: share of next year's energy fixed")
+        ax.text(0.03, 0.05, tx["tradeoff"].format(e=f"{d_e:,.0f}", es=f"{d_es:,.0f}"),
+                transform=ax.transAxes, fontsize=9, color="#333")
+    if tx["decimal"] == ",":
+        fmt = FuncFormatter(lambda v, _: f"{v:.2f}".replace(".", ","))
+        ax.xaxis.set_major_formatter(fmt)
+        ax.yaxis.set_major_formatter(fmt)
+    ax.margins(x=0.07, y=0.12)   # room for the 0% / 100% labels at the ends
+    ax.set_xlabel(tx["xlabel"])
+    ax.set_ylabel(tx["ylabel"])
+    ax.set_title(tx["title"])
     ax.legend(fontsize=8, frameon=False, loc="upper right")
     ax.grid(alpha=0.25)
     if own:
         fig.tight_layout()
-        fig.savefig(path, dpi=140)
+        fig.savefig(path, dpi=140, format="png")
         plt.close(fig)
 
 
