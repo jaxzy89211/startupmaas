@@ -27,9 +27,14 @@ def _read_investing_csv(path: Path) -> pd.Series:
     return pd.Series(s.values, index=idx).sort_index().dropna()
 
 
-def load_prices(data_dir: Path = DATA) -> pd.DataFrame:
+def load_prices(
+    data_dir: Path = DATA, power_file: str = "power_nl_daily.csv", start: str | None = None
+) -> pd.DataFrame:
     """Daily calendar-day frame with columns gas, power and (if data/co2_eua.csv exists) co2.
-    Gas/CO2 are forward-filled over weekends; column 'gas_trade' flags real gas trading days."""
+
+    Gas/CO2 are forward-filled over weekends; column 'gas_trade' flags real gas trading days.
+    power_file: another market's day-ahead prices (e.g. data/extended/power_de_lu_daily.csv);
+    start: first day (default config.yaml data.start_date)."""
     g = pd.read_csv(data_dir / "gas_ttf.csv")
     gcol = "Close" if "Close" in g.columns else None
     gas = (
@@ -37,11 +42,13 @@ def load_prices(data_dir: Path = DATA) -> pd.DataFrame:
         if gcol
         else _read_investing_csv(data_dir / "gas_ttf.csv")
     )
-    p = pd.read_csv(data_dir / "power_nl_daily.csv", index_col=0)
+    p = pd.read_csv(data_dir / power_file, index_col=0)
     pidx = pd.to_datetime(p.index, utc=True).tz_convert("Europe/Amsterdam").tz_localize(None).normalize()
     power = pd.Series(p.iloc[:, 0].values, index=pidx)
 
-    idx = pd.date_range(DATA_START, min(power.index.max(), gas.index.max() + pd.Timedelta(days=GAS_LAG_DAYS)), freq="D")
+    idx = pd.date_range(
+        start or DATA_START, min(power.index.max(), gas.index.max() + pd.Timedelta(days=GAS_LAG_DAYS)), freq="D"
+    )
     df = pd.DataFrame(index=idx)
     df["power"] = power.reindex(idx)
     df["gas_trade"] = gas.reindex(idx).notna()
@@ -54,7 +61,7 @@ def load_prices(data_dir: Path = DATA) -> pd.DataFrame:
     df = df.dropna(subset=["power", "gas"])
     from . import forwards  # a forwards file (if any) changes results, so it is part of the data hash
 
-    register_data(df, data_dir, extra_files=(forwards.FORWARDS_PATH,))
+    register_data(df, data_dir, extra_files=(forwards.FORWARDS_PATH, data_dir / power_file))
     return df
 
 

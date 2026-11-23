@@ -52,6 +52,7 @@ LADDER_BASE = _B["ladder_base"]  # bought in 6 monthly tranches in H2 of Y-2
 LADDER_MAX_STEP = _B["ladder_max_step"]  # target <= previous season's target + this
 # NOTE: the ladder rule was designed AFTER seeing the 2021-2025 backtest results, so its backtest numbers are not
 # independent evidence that it works (see RESULTS.md).
+EXTENDED_START = "2015-01-01"  # --extended: use everything available (gas from 23 Oct 2017 is the binding limit)
 POLICY_GAMMA = _B["policy_gamma"]  # risk aversion used by the HedgeWise policy and ladder
 # Benchmark strategies are defined by their names ("Tranches 6x (60%)" = 0.1 per date, ...), so their shares are
 # part of the definition, not tunable assumptions; they stay here as named constants.
@@ -462,13 +463,26 @@ def main(argv: list[str] | None = None) -> pd.DataFrame:
     )
     company_input.add_cli_args(ap)
     ap.add_argument("--pitch-year", type=int, default=_B["pitch_year"])
+    ap.add_argument("--market", default="NL", choices=["NL", "DE-LU", "BE"], help="day-ahead power market")
+    ap.add_argument("--extended", action="store_true", help="NL with the longer history in data/extended/")
     ap.add_argument("--allow-timing", action="store_true", help="HedgeWise may fix everything at once")
     args = ap.parse_args(argv)
     if not 7 <= args.typical_month <= 12:
         ap.error("--typical-month must be 7-12 (decisions are made in Jul-Dec of the year before)")
 
     hw.OUT.mkdir(exist_ok=True)
-    df = hw.load_prices()
+    if args.market != "NL" or args.extended:  # longer history in data/extended/ (python download_data.py --extended)
+        df = hw.load_prices(
+            hw.DATA / "extended", f"power_{args.market.lower().replace('-', '_')}_daily.csv", start=EXTENDED_START
+        )
+        tag = f"_{args.market}" + ("_extended" if args.extended or args.market != "NL" else "")
+        print(
+            f"Market {args.market}: day-ahead power from data/extended/, TTF gas; history "
+            f"{df.index.min().date()} .. {df.index.max().date()}"
+        )
+    else:
+        df = hw.load_prices()
+        tag = ""
     company = company_input.company_from_args(args)
     print(
         f"Company: {company.name} | gas {sum(company.gas_m3):,.0f} m3/yr "
@@ -490,8 +504,8 @@ def main(argv: list[str] | None = None) -> pd.DataFrame:
         )
     res = pd.DataFrame(rows).T
     res.index.name = "delivery_year"
-    write_csv(res, hw.OUT / "backtest_results.csv")
-    write_json({str(k): v for k, v in infos.items()}, hw.OUT / "backtest_details.json", indent=2, default=float)
+    write_csv(res, hw.OUT / f"backtest_results{tag}.csv")
+    write_json({str(k): v for k, v in infos.items()}, hw.OUT / f"backtest_details{tag}.json", indent=2, default=float)
     print("Provenance: " + one_line())
 
     from . import forwards
@@ -509,7 +523,7 @@ def main(argv: list[str] | None = None) -> pd.DataFrame:
     show.loc["STDEV"] = (res.std() / 1e3).round(0).astype(int)
     show.loc["MAX JUMP"] = (res.diff().max() / 1e3).round(0).astype(int)  # biggest year-on-year increase
     stab = pd.DataFrame({"total": res.sum(), "worst_year": res.max(), "stdev": res.std(), "max_jump": res.diff().max()})
-    write_csv(stab, hw.OUT / "backtest_stability.csv")
+    write_csv(stab, hw.OUT / f"backtest_stability{tag}.csv")
     print(show.to_string())
     print("\nRealised average prices (EUR/MWh):")
     for y in args.years:
@@ -559,11 +573,11 @@ def main(argv: list[str] | None = None) -> pd.DataFrame:
 
     py = args.pitch_year if args.pitch_year in res.index else res.index[0]
     lam_main = 0.5 if 0.5 in args.risk_aversion else args.risk_aversion[0]
-    plot_pitch(res, infos, py, company, hw.OUT / f"pitch_{py}.png")
-    plot_all_years(res, hw.OUT / "backtest_all_years.png")
+    plot_pitch(res, infos, py, company, hw.OUT / f"pitch_{py}{tag}.png")
+    plot_all_years(res, hw.OUT / f"backtest_all_years{tag}.png")
     typ_key = [k for k in res.columns if k.startswith("Fix 100%")][0]
-    plot_cycle(res, typ_key, hw.OUT / "pitch_cycle.png")
-    plot_calibration(infos, res, hw.OUT / "backtest_calibration.png")
+    plot_cycle(res, typ_key, hw.OUT / f"pitch_cycle{tag}.png")
+    plot_calibration(infos, res, hw.OUT / f"backtest_calibration{tag}.png")
     r = res.loc[py]
     hwk = f"HedgeWise (risk aversion {lam_main})"
     tr = r["Tranches 6x (100%)"]
@@ -573,5 +587,5 @@ def main(argv: list[str] | None = None) -> pd.DataFrame:
         f"(saving EUR {(r['All variable'] - tr) / 1e6:.2f}m, {(r['All variable'] - tr) / r['All variable']:.0%}). "
         f"HedgeWise optimiser (risk aversion {lam_main}): EUR {r[hwk] / 1e6:.2f}m."
     )
-    print(f"Charts: {hw.OUT}/pitch_{py}.png, pitch_cycle.png, backtest_all_years.png, backtest_calibration.png")
+    print(f"Charts: {hw.OUT}/pitch_{py}{tag}.png, pitch_cycle{tag}.png, backtest_all_years{tag}.png, ...")
     return res

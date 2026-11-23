@@ -3,6 +3,7 @@ Download / refresh the price data used by HedgeWise.
 
     python download_data.py              # power (Energy-Charts) + gas (Yahoo TTF=F), 2019 -> today
     python download_data.py --entsoe     # power from ENTSO-E instead (needs env var ENTSOE_TOKEN)
+    python download_data.py --extended   # NL, DE-LU and BE power + TTF gas, as far back as possible -> data/extended/
 
 Writes
     data/power_nl_hourly.csv   timestamp (UTC), price_eur_mwh   (15-min resolution from Oct 2025)
@@ -48,19 +49,65 @@ def _get(url: str, params: dict, tries: int = 8) -> requests.Response:
     raise RuntimeError(f"gave up after {tries} tries: {url}")
 
 
-def power_energy_charts(start_year: int = 2019) -> pd.DataFrame:
-    """Dutch day-ahead prices from Energy-Charts, one request per year."""
-    frames = []
-    for y in range(start_year, dt.date.today().year + 1):
-        r = _get("https://api.energy-charts.info/price", {"bzn": "NL", "start": f"{y}-01-01", "end": f"{y}-12-31"})
-        j = r.json()
-        df = pd.DataFrame(
+# Energy-Charts bidding-zone codes per market; Germany was DE-AT-LU until 30 Sep 2018 and DE-LU after.
+ZONES = {
+    "NL": [("NL", None, None)],
+    "BE": [("BE", None, None)],
+    "DE-LU": [("DE-AT-LU", None, "2018-09-30"), ("DE-LU", "2018-10-01", None)],
+}
+EARLIEST_YEAR = 2015
+
+
+def _energy_charts_year(bzn: str, year: int, tries: int = 4) -> pd.DataFrame | None:
+    """One calendar year of day-ahead prices for a bidding zone, or None if the API has no data for it."""
+    for attempt in range(tries):
+        try:
+            r = _get(
+                "https://api.energy-charts.info/price", {"bzn": bzn, "start": f"{year}-01-01", "end": f"{year}-12-31"}
+            )
+            j = r.json()
+        except (ValueError, requests.HTTPError):  # empty or non-JSON reply: wait and retry, then give up on this year
+            time.sleep(20 * (attempt + 1))
+            continue
+        if not j.get("unix_seconds"):
+            return None
+        return pd.DataFrame(
             {"timestamp": pd.to_datetime(j["unix_seconds"], unit="s", utc=True), "price_eur_mwh": j["price"]}
         )
-        print(f"   power {y}: {len(df)} rows")
-        frames.append(df)
-        time.sleep(15)  # the API rate-limits bursts
-    return pd.concat(frames).drop_duplicates("timestamp").sort_values("timestamp")
+    return None
+
+
+def power_energy_charts(start_year: int = 2019, market: str = "NL") -> pd.DataFrame:
+    """Day-ahead prices for a market (NL, BE, DE-LU) from Energy-Charts, one request per year and zone."""
+    frames = []
+    for bzn, frm, until in ZONES[market]:
+        for y in range(start_year, dt.date.today().year + 1):
+            if (frm and y < int(frm[:4])) or (until and y > int(until[:4])):
+                continue
+            df = _energy_charts_year(bzn, y)
+            time.sleep(15)  # the API rate-limits bursts
+            if df is None:
+                print(f"   {market} ({bzn}) {y}: no data")
+                continue
+            if frm:
+                df = df[df.timestamp >= pd.Timestamp(frm, tz="Europe/Berlin")]
+            if until:
+                df = df[df.timestamp < pd.Timestamp(until, tz="Europe/Berlin") + pd.Timedelta(days=1)]
+            print(f"   {market} ({bzn}) {y}: {len(df)} rows")
+            frames.append(df)
+    return pd.concat(frames).dropna().drop_duplicates("timestamp").sort_values("timestamp")
+
+
+def daily(p: pd.DataFrame) -> pd.Series:
+    """Calendar-day average (Europe/Amsterdam; NL, BE and DE share the CET time zone)."""
+    return (
+        p.set_index("timestamp")
+        .price_eur_mwh.tz_convert("Europe/Amsterdam")
+        .resample("D")
+        .mean()
+        .dropna()
+        .rename("price_eur_mwh")
+    )
 
 
 def power_entsoe(token: str, start_year: int = 2019) -> pd.DataFrame:
@@ -97,11 +144,11 @@ def power_entsoe(token: str, start_year: int = 2019) -> pd.DataFrame:
     )
 
 
-def gas_yahoo() -> pd.DataFrame:
-    """Daily TTF front-month prices from Yahoo Finance (TTF=F)."""
+def gas_yahoo(start: str = "2019-01-01") -> pd.DataFrame:
+    """Daily TTF front-month prices from Yahoo Finance (TTF=F; available from 23 Oct 2017)."""
     import yfinance as yf
 
-    g = yf.download("TTF=F", start="2019-01-01", progress=False, auto_adjust=False)
+    g = yf.download("TTF=F", start=start, progress=False, auto_adjust=False)
     g.columns = [c[0] if isinstance(c, tuple) else c for c in g.columns]
     g = g[["Open", "High", "Low", "Close", "Volume"]]
     g.index.name = "Date"
@@ -114,8 +161,30 @@ def main() -> None:
     ap.add_argument("--entsoe", action="store_true", help="use ENTSO-E for power (needs ENTSOE_TOKEN)")
     ap.add_argument("--skip-power", action="store_true")
     ap.add_argument("--skip-gas", action="store_true")
+    ap.add_argument(
+        "--extended",
+        action="store_true",
+        help="download NL, DE-LU and BE power and TTF gas as far back as the free sources allow into data/extended/ "
+        "(the default files in data/ are left untouched, so the headline results don't move)",
+    )
     args = ap.parse_args()
     DATA.mkdir(exist_ok=True)
+    if args.extended:
+        ext = DATA / "extended"
+        ext.mkdir(exist_ok=True)
+        for market in ZONES:
+            print(f"Downloading {market} day-ahead power from {EARLIEST_YEAR} ...")
+            d = daily(power_energy_charts(EARLIEST_YEAR, market))
+            f = ext / f"power_{market.lower().replace('-', '_')}_daily.csv"
+            d.to_csv(f)
+            print(
+                f"   saved {len(d)} days ({d.index.min().date()} .. {d.index.max().date()}) "
+                f"-> {f.relative_to(DATA.parent)}"
+            )
+        g = gas_yahoo(start=f"{EARLIEST_YEAR}-01-01")
+        g.to_csv(ext / "gas_ttf.csv")
+        print(f"   gas: {len(g)} days ({g.index.min().date()} .. {g.index.max().date()}) -> data/extended/gas_ttf.csv")
+        return
 
     if not args.skip_power:
         print("Downloading Dutch day-ahead power prices ...")
@@ -127,14 +196,7 @@ def main() -> None:
         else:
             p = power_energy_charts()
         p.to_csv(DATA / "power_nl_hourly.csv", index=False)
-        d = (
-            p.set_index("timestamp")
-            .price_eur_mwh.tz_convert("Europe/Amsterdam")
-            .resample("D")
-            .mean()
-            .dropna()
-            .rename("price_eur_mwh")
-        )
+        d = daily(p)
         d.to_csv(DATA / "power_nl_daily.csv")
         print(f"   saved {len(p)} intervals, {len(d)} days -> data/power_nl_daily.csv")
 
