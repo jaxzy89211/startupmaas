@@ -23,3 +23,6 @@ output/monitor/
 # only the made-up example client is committed
 clients/*.yaml
 !clients/example.yaml
+
+# git bundles (full copies of the history) never go into the repository
+*.bundle

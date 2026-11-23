@@ -2,6 +2,10 @@
 
 Energy price-risk model for mid-sized Dutch companies: **consumption in → worst-case bill and hedge recommendation out.**
 
+> **Pitch numbers come from git tag `pitch-freeze-v1`** (23 Nov 2026): see `PITCH_NUMBERS.md` for every number allowed
+> on a slide, its source and its caveat. The recommendation is the HedgeWise ladder, pre-registered that day
+> (`PREREGISTRATION.md`). To reproduce: `git checkout pitch-freeze-v1`.
+
 ## How it fits together
 
 ```mermaid
