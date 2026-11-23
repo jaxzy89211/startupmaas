@@ -118,6 +118,8 @@ backtest:
   pitch_year: 2022
   policy_gamma: 0.5               # risk aversion used by the HedgeWise policy and ladder
   ladder_base: 0.40               # HedgeWise ladder: share bought in H2 of Y-2
+  ladder_preregistered: "2026-11-23"   # the ladder became the official rule on this date (PREREGISTRATION.md)
+  ladder_rule_commit: "5023af4aad018666502905e6eea4566fe7067027"   # git commit that made the ladder the rule
   ladder_max_step: 0.10           # ladder target <= previous season's target + 10 points
                                   # (ladder designed AFTER seeing the 2021-2025 results: not independent evidence)
 
