@@ -640,6 +640,10 @@ def honest_bad_case(a: Analysis, df: pd.DataFrame) -> Analysis:
     (table) and per share fixed (frontier), with its source ('model' or 'stress'). Why: the model's 12-month ranges
     were too narrow before the 2021-22 crisis (72% coverage instead of 90%, RESULTS.md). The recommendation is not
     recomputed: the default objective is mean-variance and doesn't use the bad case."""
+    if a.model.as_of < pd.Timestamp(STRESS_YEAR, 12, 31):
+        # the shock is built from 2021 and 2022 prices: before the end of 2022 that would be look-ahead, so a
+        # historical decision date gets the model's ES95 only
+        return a
     t = a.table.copy()
     shock = [shock_bill(a, df, *_column_hedge(k, a.recommendation)) for k in t.index]
     t["shock"] = shock

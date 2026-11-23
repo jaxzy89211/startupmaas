@@ -121,8 +121,8 @@ Model validation), so the bad case shown to clients is **never lower than a repe
 for every strategy and every point on the trade-off chart it is the higher of (a) the model's ES95 (average of the
 worst 5% of scenarios) and (b) the bill in the "shock as big as 2021→2022, from today" stress scenario, labelled
 "model" or "stress". Today the shock sets the bad case for every strategy except fixing 100% (now: both equal, €2.12m; in tranches: the
-model's ES95 is higher); on 30 Jun
-2021 and 30 Jun 2022 the model's ES95 was the higher one. **The recommendation is not affected:** the optimiser's
+model's ES95 is higher). For decision dates before the end of 2022 (the 30 Jun 2021 and 30 Jun 2022 rows) only the
+model's ES95 is used: the 2021→2022 shock wasn't known yet, so using it would be look-ahead. **The recommendation is not affected:** the optimiser's
 objective is mean-variance (E + γ/2·Var/E) and doesn't use the bad case, and the ladder's cap doesn't either, so the
 advised share is the same as before; only the bad-case numbers shown next to it change.
 

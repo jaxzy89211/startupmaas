@@ -91,3 +91,11 @@ def test_labels_en_nl():
     assert TEXT["nl"]["bad_from"].format(src=TEXT["nl"]["bad_src"]["model"]).endswith("(bron: model)</font>")
     assert "72% of outcomes instead of 90%" in TEXT["en"]["honest_note"]
     assert "72% van de uitkomsten in plaats van 90%" in TEXT["nl"]["honest_note"]
+
+
+def test_no_look_ahead_in_the_honest_bad_case(df):
+    """Before the end of 2022 the 2021->22 shock is not known yet: the bad case stays the model's ES95."""
+    a = hw.recommend(hw.fit(df, "2021-06-30"), hw.Company(), df, None, 500, 1)
+    assert "bad_case" not in a.table and hw.bad_case(a) == (pytest.approx(a.table.iloc[-1]["es95"]), "model")
+    b = hw.recommend(hw.fit(df, "2023-06-30"), hw.Company(), df, None, 500, 1)
+    assert "bad_case" in b.table
