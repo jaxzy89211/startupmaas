@@ -238,3 +238,9 @@ monitor:                          # monthly update (monitor.py, MONITORING.md); 
   bad_case_change: 0.15           # flag the bad case moving more than 15% since last month
   price_change: 0.20              # flag a fixed price moving more than 20% since last month
   overdue_tolerance: 0.01         # a planned tranche counts as overdue if more than 1 point is still missing
+
+forwards:                         # importing real forward prices (forwards_import.py)
+  codes: {}                       # instrument code -> product name, for exports that only show codes (RICs,
+                                  # Bloomberg tickers), e.g. {"TFMBYZ7": "TTF Cal-27", "XXXX Comdty": "NL Base Cal-27"}.
+                                  # Left empty on purpose: fill it in from the first real export (the import report
+                                  # lists every code it couldn't map), never from memory.

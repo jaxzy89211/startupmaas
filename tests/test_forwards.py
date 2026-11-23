@@ -64,3 +64,18 @@ def test_switch_proxy_to_forward(monkeypatch):
     # a delivery that doesn't start on 1 January can't use a calendar product -> proxy
     a2 = hw.analyse(m, hw.Company(), "2027-04-01", n_paths=300, seed=1)
     assert a2.recommendation["price_source"]["gas"].startswith("proxy")
+
+
+def test_other_hubs_and_countries_are_rejected():
+    from hedgewise.forwards import parse_product
+
+    assert parse_product("TTF Cal-27") == ("gas", 2027) and parse_product("Dutch Power Base Cal-27") == ("power", 2027)
+    for name in (
+        "NBP Gas Cal-27",
+        "THE Gas Cal-27",
+        "German Power Base Cal-27",
+        "Phelix DE Base Cal-27",
+        "Belgian Power Base Cal 2027",
+        "PEG Cal-27",
+    ):
+        assert parse_product(name) is None, name

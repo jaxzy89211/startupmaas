@@ -30,6 +30,11 @@ FORWARDS_PATH = Path(os.environ.get("HEDGEWISE_FORWARDS", DATA / "forwards.csv")
 
 GAS_WORDS = ("ttf", "gas")
 POWER_WORDS = ("power", "base", "stroom", "elec", "electricity", "nl b", "dutch b", "baseload")
+# other gas hubs and other countries' power (an export can contain them next to TTF and Dutch power)
+OTHER_HUBS = (
+    r"\b(nbp|the|thx|peg|psv|zee|zeebrugge|ncg|gaspool|ztp|ceg|vtp|henry|jkm|german|germany|phelix|deutsch|belgian|"
+    r"belgium|french|france|uk|british|nordic|italian|italy|spanish|spain|austria|austrian|swiss|czech|polish|hungar)\b"
+)
 _CAL = re.compile(r"cal(?:endar)?[\s\-_/]*'?(\d{4}|\d{2})\b|\by[\s\-]?(\d{2}|\d{4})\b", re.IGNORECASE)
 
 
@@ -45,6 +50,8 @@ def parse_product(name: str) -> tuple[str, int] | None:
         return None
     y = int(m.group(1) or m.group(2))
     year = y + 2000 if y < 100 else y
+    if re.search(OTHER_HUBS, s):  # another gas hub or another country's power: not what a Dutch buyer fixes
+        return None
     if any(w in s for w in GAS_WORDS):
         return "gas", year
     if any(w in s for w in POWER_WORDS):
