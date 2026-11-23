@@ -220,7 +220,54 @@
         "capped": false,
         "bought": 0.0
       }
-    ]
+    ],
+    "ladder": [
+      {
+        "date": "2020-06-30",
+        "optimiser": 0.75,
+        "cap": 0.5,
+        "target": 0.5,
+        "bought": 0.0167
+      },
+      {
+        "date": "2020-07-31",
+        "optimiser": 0.75,
+        "cap": 0.5,
+        "target": 0.5,
+        "bought": 0.0167
+      },
+      {
+        "date": "2020-08-31",
+        "optimiser": 0.75,
+        "cap": 0.5,
+        "target": 0.5,
+        "bought": 0.0167
+      },
+      {
+        "date": "2020-09-30",
+        "optimiser": 0.65,
+        "cap": 0.5,
+        "target": 0.5,
+        "bought": 0.0167
+      },
+      {
+        "date": "2020-10-31",
+        "optimiser": 0.55,
+        "cap": 0.5,
+        "target": 0.5,
+        "bought": 0.0167
+      },
+      {
+        "date": "2020-11-30",
+        "optimiser": 0.4,
+        "cap": 0.5,
+        "target": 0.4,
+        "bought": 0.0
+      }
+    ],
+    "ladder_final_target": 0.4,
+    "ladder_fixed_share": 0.48333333333333334,
+    "ladder_prev_target_used": null
   },
   "2022": {
     "realised_avg_price": {
@@ -459,7 +506,54 @@
         "capped": false,
         "bought": 0.0
       }
-    ]
+    ],
+    "ladder": [
+      {
+        "date": "2021-06-30",
+        "optimiser": 0.7,
+        "cap": 0.5,
+        "target": 0.5,
+        "bought": 0.0167
+      },
+      {
+        "date": "2021-07-31",
+        "optimiser": 0.65,
+        "cap": 0.5,
+        "target": 0.5,
+        "bought": 0.0167
+      },
+      {
+        "date": "2021-08-31",
+        "optimiser": 0.6,
+        "cap": 0.5,
+        "target": 0.5,
+        "bought": 0.0167
+      },
+      {
+        "date": "2021-09-30",
+        "optimiser": 0.65,
+        "cap": 0.5,
+        "target": 0.5,
+        "bought": 0.0167
+      },
+      {
+        "date": "2021-10-31",
+        "optimiser": 0.6,
+        "cap": 0.5,
+        "target": 0.5,
+        "bought": 0.0167
+      },
+      {
+        "date": "2021-11-30",
+        "optimiser": 0.5,
+        "cap": 0.5,
+        "target": 0.5,
+        "bought": 0.0167
+      }
+    ],
+    "ladder_final_target": 0.5,
+    "ladder_fixed_share": 0.5,
+    "ladder_prev_target_used": 0.4
   },
   "2023": {
     "realised_avg_price": {
@@ -706,7 +800,54 @@
         "capped": false,
         "bought": 0.0125
       }
-    ]
+    ],
+    "ladder": [
+      {
+        "date": "2022-06-30",
+        "optimiser": 0.85,
+        "cap": 0.6,
+        "target": 0.6,
+        "bought": 0.0333
+      },
+      {
+        "date": "2022-07-31",
+        "optimiser": 0.85,
+        "cap": 0.6,
+        "target": 0.6,
+        "bought": 0.0333
+      },
+      {
+        "date": "2022-08-31",
+        "optimiser": 0.9,
+        "cap": 0.6,
+        "target": 0.6,
+        "bought": 0.0333
+      },
+      {
+        "date": "2022-09-30",
+        "optimiser": 0.85,
+        "cap": 0.6,
+        "target": 0.6,
+        "bought": 0.0333
+      },
+      {
+        "date": "2022-10-31",
+        "optimiser": 0.8,
+        "cap": 0.6,
+        "target": 0.6,
+        "bought": 0.0333
+      },
+      {
+        "date": "2022-11-30",
+        "optimiser": 0.7,
+        "cap": 0.6,
+        "target": 0.6,
+        "bought": 0.0333
+      }
+    ],
+    "ladder_final_target": 0.6,
+    "ladder_fixed_share": 0.6,
+    "ladder_prev_target_used": 0.5
   },
   "2024": {
     "realised_avg_price": {
@@ -945,7 +1086,54 @@
         "capped": false,
         "bought": 0.0
       }
-    ]
+    ],
+    "ladder": [
+      {
+        "date": "2023-06-30",
+        "optimiser": 0.95,
+        "cap": 0.7,
+        "target": 0.7,
+        "bought": 0.05
+      },
+      {
+        "date": "2023-07-31",
+        "optimiser": 0.9,
+        "cap": 0.7,
+        "target": 0.7,
+        "bought": 0.05
+      },
+      {
+        "date": "2023-08-31",
+        "optimiser": 0.9,
+        "cap": 0.7,
+        "target": 0.7,
+        "bought": 0.05
+      },
+      {
+        "date": "2023-09-30",
+        "optimiser": 0.8,
+        "cap": 0.7,
+        "target": 0.7,
+        "bought": 0.05
+      },
+      {
+        "date": "2023-10-31",
+        "optimiser": 0.85,
+        "cap": 0.7,
+        "target": 0.7,
+        "bought": 0.05
+      },
+      {
+        "date": "2023-11-30",
+        "optimiser": 0.65,
+        "cap": 0.7,
+        "target": 0.65,
+        "bought": 0.0
+      }
+    ],
+    "ladder_final_target": 0.65,
+    "ladder_fixed_share": 0.6499999999999999,
+    "ladder_prev_target_used": 0.6
   },
   "2025": {
     "realised_avg_price": {
@@ -1192,6 +1380,53 @@
         "capped": false,
         "bought": 0.0358
       }
-    ]
+    ],
+    "ladder": [
+      {
+        "date": "2024-06-30",
+        "optimiser": 0.9,
+        "cap": 0.75,
+        "target": 0.75,
+        "bought": 0.0583
+      },
+      {
+        "date": "2024-07-31",
+        "optimiser": 0.85,
+        "cap": 0.75,
+        "target": 0.75,
+        "bought": 0.0583
+      },
+      {
+        "date": "2024-08-31",
+        "optimiser": 0.8,
+        "cap": 0.75,
+        "target": 0.75,
+        "bought": 0.0583
+      },
+      {
+        "date": "2024-09-30",
+        "optimiser": 0.75,
+        "cap": 0.75,
+        "target": 0.75,
+        "bought": 0.0583
+      },
+      {
+        "date": "2024-10-31",
+        "optimiser": 0.7,
+        "cap": 0.75,
+        "target": 0.7,
+        "bought": 0.0333
+      },
+      {
+        "date": "2024-11-30",
+        "optimiser": 0.65,
+        "cap": 0.75,
+        "target": 0.65,
+        "bought": 0.0
+      }
+    ],
+    "ladder_final_target": 0.65,
+    "ladder_fixed_share": 0.6666666666666667,
+    "ladder_prev_target_used": 0.65
   }
 }

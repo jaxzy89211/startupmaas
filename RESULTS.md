@@ -61,6 +61,22 @@ The policy (`policy_plan` in `hedgewise_model.py`) takes the optimizer's target 
 * **What would address it** (not done, because the cap mustn't be tuned on these results): carry the previous season's target over as the starting point of the cap, or add mean reversion to the gas model. Decide either one on reasoning first, then test it once.
 * **Pitch implication:** sell the *discipline* (60% in tranches or a 2-year ladder) as the recommendation, and the model as the tool that *measures* the risk (bad-case bill, stress test, frontier). Don't claim the optimizer beats simple rules.
 
+### HedgeWise ladder: ⚠️ designed AFTER seeing the 2021–2025 results, so this backtest is NOT independent evidence
+
+**Rule:** buy 40% in 6 monthly tranches in H2 of Y-2. In H2 of Y-1, top up in equal monthly tranches to the model's target (γ = 0.5). The target may not exceed the **previous season's** target by more than 10 points. "Previous season's target" is the ladder's target on the last decision date for delivery year Y-1. For 2021 there is no previous season in the data, so the 40% base layer is used as the starting point (cap 50%). The rule combines what the earlier sections showed: layering across two years helped, and between-season jumps hurt. **That's exactly why its good numbers below prove nothing yet**; it needs testing on data it wasn't designed on (other years, other markets, or the coming seasons).
+
+| €k, 2021–2025 | Total | Worst year | Biggest jump |
+|---|---|---|---|
+| All variable | 6,403 | 2,670 | 1,584 |
+| Tranches 6× (60%) | 6,713 | 2,472 | 1,244 |
+| Layered 2 years (40+40%) | 6,602 | 2,107 | 930 |
+| HedgeWise policy γ=0.5 | 7,195 | 2,901 | 1,227 |
+| **HedgeWise ladder** (in-sample!) | 6,712 | **1,894** | **855** |
+
+Per year: 729 / 1,584 / 1,612 / 1,894 / 893. The ladder fixed 48%, 50%, 60%, 65% and 67% for 2021–2025. The cap held the target well below the optimizer (75–95%) in every season, so in practice it behaves like a slowly rising 50–70% two-year ladder. Its total equals 60% tranches, but its worst year and biggest jump are the lowest of all the disciplined rules. Its worst year is now 2024 (it was still carrying 2022–23 purchases), not 2023.
+
+**Pitch use:** if at all, then only as "the rule we will test going forward", never as proof.
+
 ### Two things the jury will ask about
 
 * **"Fix 60% at once in July" has the best numbers in the table (total €5.56m), but that's luck.** Fixing 60% once in a different month of the same half-year gives a total of €5.56m–€7.60m and a worst year of €1.85m–€3.60m. Don't pitch it.

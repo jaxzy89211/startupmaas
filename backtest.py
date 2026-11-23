@@ -17,6 +17,9 @@ Strategies
   Tranches 6x (60%)      the same, but only 60% of the volume (1/10 per date); 40% stays variable
   Layered 2 years        40% fixed in 6 monthly tranches in H2 of Y-2, another 40% in H2 of Y-1, 20% variable
                          (standard utility practice; the fixed price two years ahead uses the same spot proxy)
+  HedgeWise ladder       40% in 6 monthly tranches in H2 of Y-2; in H2 of Y-1 top up (equal tranches) to the model's
+                         target, capped at the previous season's target + 10 points. Designed after seeing the
+                         2021-2025 results, so its backtest is NOT independent evidence.
   HedgeWise (gamma)      on each decision date: re-fit, simulate, buy what the optimiser recommends now
   HedgeWise policy       on each decision date: re-fit, take the optimiser's share (gamma 0.5) as the target,
                          cap its rise at 20 points per month, buy the rest in equal monthly tranches (policy_plan)
@@ -40,6 +43,11 @@ import hedgewise_model as hw
 
 DECISION_MONTHS = [6, 7, 8, 9, 10, 11]   # as-of = last day of these months in year Y-1
 SOURCES = {"forward": 0, "proxy": 0}         # how many fixed prices came from real forwards vs the proxy
+LADDER_NAME = "HedgeWise ladder (40% + capped top-up)"
+LADDER_BASE = 0.40        # bought in 6 monthly tranches in H2 of Y-2
+LADDER_MAX_STEP = 0.10    # target may not exceed the previous season's target by more than 10 points
+# NOTE: the ladder rule was designed AFTER seeing the 2021-2025 backtest results, so its backtest numbers are not
+# independent evidence that it works (see RESULTS.md).
 POLICY_GAMMA = 0.5                         # risk aversion used by the HedgeWise policy (layered, capped)
 
 
@@ -77,7 +85,10 @@ def _fp_safe(df, c, as_of, delivery_start):
     return fixed_price(df, c, as_of, delivery_start, m)
 
 
-def run_year(df, company, year, lambdas, n_paths, seed, typical_month, verbose=True, allow_timing=False):
+def run_year(df, company, year, lambdas, n_paths, seed, typical_month, verbose=True, allow_timing=False,
+             prev_ladder_target=None):
+    """prev_ladder_target: the HedgeWise ladder's final target for delivery year `year`-1 (None if that year is not
+    in this run; the 40% base layer is then used as the starting point of the cap)."""
     ds = pd.Timestamp(f"{year}-01-01")
     dates = [pd.Timestamp(year - 1, m, 1) + pd.offsets.MonthEnd(0) for m in DECISION_MONTHS]
     vol = {"gas": company.gas_mwh, "power": company.power_mwh}
@@ -88,6 +99,11 @@ def run_year(df, company, year, lambdas, n_paths, seed, typical_month, verbose=T
     hedged = {lam: {"gas": [], "power": []} for lam in lambdas}   # list of (fraction, price)
     policy = {"gas": [], "power": []}                               # HedgeWise policy (gamma POLICY_GAMMA)
     policy_log, prev_target = [], None
+    # HedgeWise ladder: 40% base layer bought in H2 of Y-2 (priced after the loop), top-up to the capped target here
+    ladder_top = {"gas": [], "power": []}
+    ladder_log = []
+    ladder_cap = (LADDER_BASE if prev_ladder_target is None else prev_ladder_target) + LADDER_MAX_STEP
+    ladder_target = LADDER_BASE
     calib = None
     for k, d in enumerate(dates):
         t0 = time.time()
@@ -125,6 +141,15 @@ def run_year(df, company, year, lambdas, n_paths, seed, typical_month, verbose=T
                 policy[c].append((plan["buy_now"], fp[d][c]))
         policy_log.append({"date": str(d.date()), "optimiser": plan["raw_target"], "target": plan["target"],
                            "capped": plan["capped"], "bought": round(plan["buy_now"], 4)})
+        raw = float(a_pol.recommendation["hedge_gas"])
+        ladder_target = min(1.0, max(LADDER_BASE, min(raw, ladder_cap)))
+        l_done = LADDER_BASE + sum(f for f, _ in ladder_top["gas"])
+        l_buy = max(0.0, ladder_target - l_done) / n_left         # equal monthly tranches, never front-loaded
+        if l_buy > 1e-9:
+            for c in ("gas", "power"):
+                ladder_top[c].append((l_buy, fp[d][c]))
+        ladder_log.append({"date": str(d.date()), "optimiser": raw, "cap": round(ladder_cap, 4),
+                           "target": ladder_target, "bought": round(l_buy, 4)})
         if verbose:
             print(f"  {year}: decision {d.date()} fitted+simulated in {time.time()-t0:.0f}s | "
                   f"fixed price gas {fp[d]['gas']:.1f}, power {fp[d]['power']:.1f}")
@@ -150,6 +175,7 @@ def run_year(df, company, year, lambdas, n_paths, seed, typical_month, verbose=T
     res["Layered 2 years (40+40%)"] = cost_with(
         {c: [(0.4 / 6, fp2[d][c]) for d in dates2] + [(0.4 / 6, fp[d][c]) for d in dates] for c in vol})
     res[f"HedgeWise policy (gamma {POLICY_GAMMA})"] = cost_with(policy)
+    res[LADDER_NAME] = cost_with({c: [(LADDER_BASE / 6, fp2[d][c]) for d in dates2] + ladder_top[c] for c in vol})
     hw_detail = {}
     for lam in lambdas:
         res[f"HedgeWise (risk aversion {lam})"] = cost_with(hedged[lam])
@@ -158,7 +184,10 @@ def run_year(df, company, year, lambdas, n_paths, seed, typical_month, verbose=T
     once = {hw.MONTHS[d.month]: cost_with({c: [(1.0, fp[d][c])] for c in vol}) for d in dates}
     info = {"realised_avg_price": {c: float(vol[c] @ real[c] / vol[c].sum()) for c in vol},
             "fixed_prices": {str(d.date()): fp[d] for d in dates}, "hedgewise_trades": hw_detail,
-            "fix_once_by_month": once, "model_forecast_all_variable": calib, "policy": policy_log}
+            "fix_once_by_month": once, "model_forecast_all_variable": calib, "policy": policy_log,
+            "ladder": ladder_log, "ladder_final_target": ladder_target,
+            "ladder_fixed_share": LADDER_BASE + sum(f for f, _ in ladder_top["gas"]),
+            "ladder_prev_target_used": prev_ladder_target}
     return res, info
 
 
@@ -206,18 +235,18 @@ def plot_all_years(results: pd.DataFrame, path):
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     cols = list(results.columns)
-    fig, axes = plt.subplots(1, 2, figsize=(15, 5.5), gridspec_kw={"width_ratios": [3, 1.2]})
+    fig, axes = plt.subplots(1, 2, figsize=(15, 6.6), gridspec_kw={"width_ratios": [3, 1.2]})
     ax = axes[0]
     x = np.arange(len(results))
     w = 0.8 / len(cols)
-    pal = ["#b8433a", "#8a8f98", "#c9a227", "#2a6fdb", "#93c5fd", "#1b9e5a", "#7c3aed", "#fbbf24", "#a7f3d0",
+    pal = ["#b8433a", "#8a8f98", "#c9a227", "#2a6fdb", "#93c5fd", "#1b9e5a", "#7c3aed", "#0e7490", "#fbbf24", "#a7f3d0",
            "#0b5d33"]
     for i, c in enumerate(cols):
         ax.bar(x + i * w - 0.4 + w / 2, results[c] / 1e6, w, label=c, color=pal[i % len(pal)])
     ax.set_xticks(x, results.index)
     ax.set_ylabel("EUR m")
     ax.set_title("Annual energy bill by strategy (realised)")
-    ax.legend(fontsize=8, frameon=False, ncol=2)
+    ax.legend(fontsize=8, frameon=False, ncol=3, loc="upper center", bbox_to_anchor=(0.5, -0.06))
     ax.grid(axis="y", alpha=0.25)
     ax = axes[1]
     tot = results.sum() / 1e6
@@ -326,8 +355,9 @@ def main(argv=None):
           f"({company.gas_mwh.sum():,.0f} MWh), power {company.power_mwh.sum():,.0f} MWh/yr\n")
     rows, infos = {}, {}
     for y in args.years:
+        prev = infos[y - 1]["ladder_final_target"] if (y - 1) in infos else None
         rows[y], infos[y] = run_year(df, company, y, args.risk_aversion, args.paths, args.seed, args.typical_month,
-                                     allow_timing=args.allow_timing)
+                                     allow_timing=args.allow_timing, prev_ladder_target=prev)
     res = pd.DataFrame(rows).T
     res.index.name = "delivery_year"
     res.to_csv(hw.OUT / "backtest_results.csv")
@@ -359,6 +389,14 @@ def main(argv=None):
         print(f"  {y}: " + " | ".join(f"{p['optimiser']:.0%}->{p['target']:.0%}{'*' if p['capped'] else ''} "
                                       f"buy {p['bought']:.1%}" for p in infos[y]["policy"]))
     print("  (* = capped)")
+    print(f"\nHedgeWise ladder: {LADDER_BASE:.0%} in H2 of Y-2, then top-up to the model's target "
+          f"(capped at previous season's target + {LADDER_MAX_STEP:.0%}) in H2 of Y-1. DESIGNED AFTER SEEING THESE RESULTS.")
+    for y in args.years:
+        lg = infos[y]["ladder"]
+        prev = infos[y]["ladder_prev_target_used"]
+        print(f"  {y}: prev season target {'none -> 40% base' if prev is None else f'{prev:.0%}'}, cap {lg[0]['cap']:.0%} | "
+              + " | ".join(f"{p['optimiser']:.0%}->{p['target']:.0%} buy {p['bought']:.1%}" for p in lg)
+              + f" | fixed {infos[y]['ladder_fixed_share']:.0%}")
     print("\nFix 100% once - result depends on the month you pick (EUR k):")
     print((pd.DataFrame({y: infos[y]["fix_once_by_month"] for y in args.years}).T / 1e3).round(0).to_string())
     print("\nModel forecast of the all-variable bill (as of 30 Jun of the year before) vs realised (EUR k):")
