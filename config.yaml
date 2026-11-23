@@ -19,6 +19,8 @@ fixed_price:
 model:
   variance: garch_t               # gas/CO2 volatility model: garch_t (default) | gjr_t | garch_jump.
                                   # Chosen ONLY on the out-of-sample validation (validation.py, METHODOLOGY.md).
+                                  # Validation 23 Nov 2026 (data to 2026-11-23): KEPT garch_t. No variant had 12-month
+                                  # coverage in 80-95% (all 68-72%) and none was >3% better on 12-month CRPS (best +0.1%).
 
 garch:                            # GARCH(1,1) with Student-t errors, fitted by maximum likelihood (Nelder-Mead)
   start_values:                   # (alpha, beta, nu) starting points; the best of the three fits is kept
