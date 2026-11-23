@@ -81,6 +81,10 @@ def to_eur_per_mwh(price: float, unit: str, commodity: str) -> float:
         return float(price) * 1000.0
     if u in ("eur/gj",):
         return float(price) / MWH_PER_GJ
+    if u in ("ct/m3", "cent/m3", "eurct/m3"):
+        if commodity != "gas":
+            raise ValueError("ct/m3 only applies to gas")
+        return float(price) / 100 / MWH_PER_M3
     if u in ("eur/m3", "eur/nm3"):
         if commodity != "gas":
             raise ValueError("EUR/m3 only applies to gas")

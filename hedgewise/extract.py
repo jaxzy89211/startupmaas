@@ -68,6 +68,7 @@ class Extraction:
     fixed_on: Field = dataclasses.field(default_factory=Field)
     prices: list[dict] = dataclasses.field(default_factory=list)  # commodity, value, unit, eur_mwh, page, quote, conf.
     monthly: list[dict] = dataclasses.field(default_factory=list)  # month, gas_m3, power_kwh, page, quote, conf.
+    totals: dict = dataclasses.field(default_factory=dict)  # period totals (gas_m3, power_kwh, quote, ...) if no months
     warnings: list[str] = dataclasses.field(default_factory=list)
 
 
@@ -119,7 +120,7 @@ _DATE = (
     + "|".join(sorted(_MONTHS, key=len, reverse=True))
     + r")\s+\d{4})"
 )
-_NUM = r"(\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"
+_NUM = r"(\d{1,3}(?:[.,]\d{3})+(?!\d)(?:[.,]\d+)?|\d+(?:[.,]\d+)?)"  # '1.234,5' | '0,10230' (not '0,102')
 SUPPLIERS = [
     "Vattenfall",
     "Eneco",
@@ -239,50 +240,47 @@ def extract_rules(src: str | Path | bytes, name: str = "") -> Extraction:
             setattr(ex, attr, Field(parse_date(d), per.page, per.quote, 0.9))
     for attr, pat in (
         ("contract_start", r"(?:ingangsdatum|startdatum|contract start|start date)\s*:?\s*" + _DATE),
-        ("contract_end", r"(?:einddatum|contract end|end date)\s*:?\s*" + _DATE),
+        (
+            "contract_end",
+            r"(?:einddatum|contract end|end date|einde contract|looptijd\s+(?:t/m|tot en met|tot)|"
+            r"loopt\s+(?:t/m|tot en met|tot))\s*:?\s*" + _DATE,
+        ),
         ("fixed_on", r"(?:prijs vastgezet op|prijs vastgelegd op|price fixed on|fixed on)\s*:?\s*" + _DATE),
     ):
         f = _first(pages, pat, 0.85)
         if f.value:
             setattr(ex, attr, Field(parse_date(f.value), f.page, f.quote, f.confidence))
     # contract type
-    ct = _first(pages, r"\b(vast(?:e)?\s+(?:tarief|prijs|contract)|fixed(?:\s+price)?|variabel\w*|variable)\b", 0.8)
+    ct = _first(
+        pages,
+        r"\b(variabel\w*|variable|vast(?:e)?\s+(?:tarief|prijs|contract|\d+\s+jaar)|tarieven\s+zijn\s+vast|"
+        r"contract(?:type|vorm)?\s*:\s*vast|zakelijk\s+vast|fixed(?:\s+price)?)\b",
+        0.8,
+    )
     if ct.value:
         ex.contract_type = Field(
             "variable" if ct.value.lower().startswith("variab") else "fixed", ct.page, ct.quote, ct.confidence
         )
-    # prices: a commodity word and a number with a price unit on the same line
-    price_pat = rf"(?:€|eur)?\s*{_NUM}\s*(?:(ct|cent)\s*/\s*kwh|(?:per|/)\s*(kwh|mwh|m3|m³|gj))"
-    for i, text in enumerate(pages, start=1):
-        for line in text.splitlines():
-            c = _commodity(line)
-            m = re.search(price_pat, line, re.I)
-            if c and m and re.search(r"tarief|prijs|price|rate", line, re.I):
-                unit = (
-                    "ct/kWh"
-                    if m[2]
-                    else {"kwh": "EUR/kWh", "mwh": "EUR/MWh", "m3": "EUR/m3", "m³": "EUR/m3", "gj": "EUR/GJ"}[
-                        m[3].lower()
-                    ]
-                )
-                v = num(m[1])
-                try:
-                    eur = au.to_eur_per_mwh(v, unit, c)
-                except ValueError:
-                    continue
-                ex.prices.append(
-                    {
-                        "commodity": c,
-                        "value": v,
-                        "unit": unit,
-                        "eur_mwh": eur,
-                        "page": i,
-                        "quote": line.strip(),
-                        "confidence": 0.85,
-                    }
-                )
+    ex.prices = _price_lines(pages, num)
     ex.monthly = _monthly_rows(pages, num, ex)
-    if not ex.monthly and not ex.prices:
+    if not ex.monthly:
+        ex.totals = _consumption_totals(pages, num)
+        ps, pe = ex.period_start.value, ex.period_end.value
+        if ex.totals and ps is not None and pe is not None and (ps.year, ps.month) == (pe.year, pe.month):
+            ex.monthly = [
+                {
+                    "month": f"{ps.year}-{ps.month:02d}",
+                    "gas_m3": ex.totals.get("gas_m3"),
+                    "power_kwh": ex.totals.get("power_kwh"),
+                    "page": ex.totals["page"],
+                    "quote": ex.totals["quote"],
+                    "confidence": 0.8,
+                }
+            ]
+            ex.totals = {}
+    if any("terugle" in ln.lower() for t in pages for ln in t.splitlines()):
+        ex.warnings.append("Feed-in (teruglevering) found: not counted as consumption. Check solar with the company.")
+    if not ex.monthly and not ex.totals and not ex.prices:
         ex.warnings.append("No consumption or prices found with the standard layouts; check the document by hand.")
     return ex
 
@@ -297,7 +295,11 @@ def _monthly_rows(pages: list[str], num: _Numbers, ex: Extraction) -> list[dict]
             low = line.lower()
             if re.search(r"\b(maand|month)\b", low) and ("gas" in low or "stroom" in low or "electric" in low):
                 cols = []
-                for m in re.finditer(r"(gas|stroom|elektriciteit|electricity|power)\s*\(([^)]+)\)", low):
+                for m in re.finditer(
+                    r"(gas|stroom|elektriciteit|electricity|power)(?:\s+(?:normaal|dal|piek|laag|enkel|normal|off-peak|"
+                    r"peak))?\s*\(([^)]+)\)",
+                    low,
+                ):
                     unit = m[2].replace("³", "3").strip()
                     unit = {"m3": "m3", "kwh": "kWh", "mwh": "MWh", "gj": "GJ"}.get(unit, unit)
                     cols.append(("gas" if m[1] == "gas" else "power", unit))
@@ -321,43 +323,121 @@ def _monthly_rows(pages: list[str], num: _Numbers, ex: Extraction) -> list[dict]
             }
             for (c, unit), tok in zip(cols, vals, strict=False):
                 v = num(tok)
-                if c == "gas":
-                    row["gas_m3"] = float(ci.gas_to_m3(v, unit))
-                else:
-                    row["power_kwh"] = float(ci.power_to_kwh(v, unit))
+                key, val = ("gas_m3", ci.gas_to_m3(v, unit)) if c == "gas" else ("power_kwh", ci.power_to_kwh(v, unit))
+                row[key] = (row[key] or 0.0) + float(val)  # several columns (normal + off-peak) add up
             rows.append(row)
-    if rows:
-        return rows
-    # one-period invoice: totals for the period (only if the period is one calendar month)
-    ps, pe = ex.period_start.value, ex.period_end.value
-    if ps is None or pe is None or (ps.year, ps.month) != (pe.year, pe.month):
-        return []
-    row = {
-        "month": f"{ps.year}-{ps.month:02d}",
-        "gas_m3": None,
-        "power_kwh": None,
-        "page": None,
-        "quote": "",
-        "confidence": 0.8,
-    }
+    return rows
+
+
+_NOT_SUPPLY = re.compile(
+    r"belasting|\bode\b|opslag|netbeheer|transport|vastrecht|vaste|btw|heffing|terugle|korting|capaciteit", re.I
+)
+_UNITS = {"kwh": "kWh", "mwh": "MWh", "m3": "m3", "m³": "m3", "gj": "GJ"}
+_REGISTER = re.compile(r"\b(normaal|dal|piek|laag|enkel)\b", re.I)
+
+
+def _price_lines(pages: list[str], num: _Numbers) -> list[dict]:
+    """Supply prices: 'Leveringstarief gas: € 0,4410 per m3', '9,85 ct/kWh', '48,50 ct/m3', and quantity x price
+    lines ('120.400 kWh x € 0,10230'). Energy tax, network costs, VAT, levies and feed-in are not supply prices."""
+    pat_a = rf"(?:€|eur)?\s*{_NUM}\s*(?:(ct|cent)\s*/\s*(kwh|m3|m³)|(?:per|/)\s*(kwh|mwh|m3|m³|gj))"
+    pat_b = rf"{_NUM}\s*(kwh|mwh|m3|m³|gj)\s*x\s*(?:€|eur)?\s*{_NUM}"
+    out = []
     for i, text in enumerate(pages, start=1):
         for line in text.splitlines():
-            m = re.search(
-                rf"(gas|elektriciteit|stroom|electricity)\w*\s*(?:verbruik|consumption|use)?\s*:?\s*"
-                rf"{_NUM}\s*(m3|m³|kwh|mwh|gj)\b",
-                line,
-                re.I,
-            )
-            if not m:
+            c = _commodity(line)
+            if not c or _NOT_SUPPLY.search(line):
                 continue
-            unit = {"m3": "m3", "m³": "m3", "kwh": "kWh", "mwh": "MWh", "gj": "GJ"}[m[3].lower()]
-            v = num(m[2])
-            if m[1].lower() == "gas":
-                row["gas_m3"] = float(ci.gas_to_m3(v, unit))
+            reg = _REGISTER.search(line)
+            b = re.search(pat_b, line, re.I)
+            a = re.search(pat_a, line, re.I)
+            if b:
+                unit, qty, v = _UNITS[b[2].lower()], num(b[1]), num(b[3])
+                unit_txt = {"kWh": "EUR/kWh", "MWh": "EUR/MWh", "m3": "EUR/m3", "GJ": "EUR/GJ"}[unit]
+            elif a and re.search(r"tarief|prijs|price|rate", line, re.I):
+                qty = None
+                v = num(a[1])
+                unit_txt = (
+                    f"ct/{_UNITS[a[3].lower()]}"
+                    if a[2]
+                    else {"kwh": "EUR/kWh", "mwh": "EUR/MWh", "m3": "EUR/m3", "m³": "EUR/m3", "gj": "EUR/GJ"}[
+                        a[4].lower()
+                    ]
+                )
             else:
-                row["power_kwh"] = float(ci.power_to_kwh(v, unit))
-            row["page"], row["quote"] = i, (row["quote"] + " | " + line.strip()).strip(" |")
-    return [row] if row["gas_m3"] is not None or row["power_kwh"] is not None else []
+                continue
+            try:
+                eur = au.to_eur_per_mwh(v, unit_txt, c)
+            except ValueError:
+                continue
+            out.append(
+                {
+                    "commodity": c,
+                    "value": v,
+                    "unit": unit_txt,
+                    "eur_mwh": eur,
+                    "qty": qty,
+                    "register": reg[1].lower() if reg else None,
+                    "page": i,
+                    "quote": line.strip(),
+                    "confidence": 0.85,
+                }
+            )
+    return out
+
+
+def combined_prices(ex: Extraction) -> dict[str, dict]:
+    """One supply price per commodity (EUR/MWh): quantity-weighted over the registers when the bill shows the
+    quantities (normal + off-peak lines), else the plain average; with the quotes it came from."""
+    out = {}
+    for c in COMMODITIES:
+        ps = [p for p in ex.prices if p["commodity"] == c]
+        if not ps:
+            continue
+        if all(p.get("qty") for p in ps):
+            w = sum(p["qty"] for p in ps)
+            v = sum(p["eur_mwh"] * p["qty"] for p in ps) / w
+        else:
+            v = float(np.mean([p["eur_mwh"] for p in ps]))
+        out[c] = {
+            "eur_mwh": v,
+            "quote": " | ".join(p["quote"] for p in ps),
+            "page": ps[0]["page"],
+            "confidence": min(p["confidence"] for p in ps),
+        }
+    return out
+
+
+def _consumption_totals(pages: list[str], num: _Numbers) -> dict:
+    """Period consumption per commodity from lines like 'Elektriciteit normaal ... 120.400 kWh' (normal + off-peak
+    registers add up; a 'totaal' line wins). Lines with euro amounts (costs, tariffs) and feed-in are skipped."""
+    found: dict[str, list] = {"gas": [], "power": []}
+    for i, text in enumerate(pages, start=1):
+        for line in text.splitlines():
+            c = _commodity(line)
+            if not c or "€" in line or re.search(r"terugle|eur\b|tarief|prijs", line, re.I):
+                continue
+            hits = list(re.finditer(rf"{_NUM}\s*(kwh|mwh|m3|m³|gj)\b", line, re.I))
+            if not hits:
+                continue
+            h = hits[-1]
+            unit = _UNITS[h[2].lower()]
+            v = num(h[1])
+            val = float(ci.gas_to_m3(v, unit)) if c == "gas" else float(ci.power_to_kwh(v, unit))
+            found[c].append((val, "totaal" in line.lower(), i, line.strip()))
+    out: dict = {}
+    quotes, page = [], None
+    for c, key in (("gas", "gas_m3"), ("power", "power_kwh")):
+        items = found[c]
+        if not items:
+            continue
+        tot = [x for x in items if x[1]]
+        use = tot[:1] if tot else items
+        out[key] = sum(x[0] for x in use)
+        quotes += [x[3] for x in use]
+        page = page or use[0][2]
+    if out:
+        out.update(page=page, quote=" | ".join(quotes), confidence=0.8)
+    return out
 
 
 # --------------------------------------------------------------------------------------------
@@ -607,25 +687,29 @@ def monthly_table(exs: list[Extraction]) -> pd.DataFrame:
 
 
 def contracts_table(exs: list[Extraction]) -> pd.DataFrame:
-    """Rows for the past-contracts audit (year, commodity, share, price, unit, fixed_on) from fixed-price documents.
-    The share is set to 100 and must be checked by the person: documents rarely state the hedged share."""
+    """Rows for the past-contracts audit (year, commodity, share, price, unit, fixed_on), one per delivery year and
+    commodity, with the combined supply price (normal + off-peak lines merged, see combined_prices). A variable
+    contract gives 'variable' rows (its prices are not fixed). The share of a fixed contract is set to 100 and must
+    be checked by the person: documents rarely state the hedged share."""
     rows = []
     for ex in exs:
-        if not ex.prices:
+        prices = combined_prices(ex)
+        if not prices:
             continue
         start = ex.contract_start.value or ex.period_start.value
         end = ex.contract_end.value or ex.period_end.value
         if start is None or end is None:
             continue
+        variable = ex.contract_type.value == "variable"
         for y in range(start.year, end.year + 1):
-            for p in ex.prices:
+            for c, p in prices.items():
                 rows.append(
                     {
                         "year": y,
-                        "commodity": p["commodity"],
-                        "share_%": 100,
-                        "price": p["value"],
-                        "unit": p["unit"],
+                        "commodity": c,
+                        "share_%": None if variable else 100,
+                        "price": "variable" if variable else round(p["eur_mwh"], 2),
+                        "unit": "" if variable else "EUR/MWh",
                         "fixed_on": "" if ex.fixed_on.value is None else str(ex.fixed_on.value.date()),
                         "source": ex.source,
                         "quote": p["quote"],

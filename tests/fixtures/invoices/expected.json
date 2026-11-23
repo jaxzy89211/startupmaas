@@ -1,0 +1,112 @@
+{
+  "eneco_jaarnota.pdf": {
+    "supplier": "Eneco",
+    "period_start": "2025-01-01",
+    "period_end": "2025-12-31",
+    "contract_type": "fixed",
+    "contract_end": "2026-12-31",
+    "totals": {
+      "power_kwh": 230400.0,
+      "gas_m3": 98500.0
+    },
+    "prices_eur_mwh": {
+      "power": 96.0,
+      "gas": 46.28
+    }
+  },
+  "vattenfall_maandfactuur.pdf": {
+    "supplier": "Vattenfall",
+    "period_start": "2025-03-01",
+    "period_end": "2025-03-31",
+    "contract_type": "fixed",
+    "monthly": {
+      "2025-03": {
+        "power_kwh": 34150.0,
+        "gas_m3": 9420.0
+      }
+    },
+    "prices_eur_mwh": {
+      "power": 98.5,
+      "gas": 45.14
+    }
+  },
+  "essent_jaarafrekening.pdf": {
+    "supplier": "Essent",
+    "period_start": "2025-01-01",
+    "period_end": "2025-12-31",
+    "contract_type": "variable",
+    "totals": {
+      "power_kwh": 111900.0,
+      "gas_m3": 41800.0
+    },
+    "prices_eur_mwh": {
+      "power": 108.68,
+      "gas": 52.54
+    }
+  },
+  "greenchoice_jaaroverzicht.pdf": {
+    "supplier": "Greenchoice",
+    "contract_type": "fixed",
+    "monthly": {
+      "2025-01": {
+        "gas_m3": 14210.0,
+        "power_kwh": 38600.0
+      },
+      "2025-02": {
+        "gas_m3": 12980.0,
+        "power_kwh": 36400.0
+      },
+      "2025-03": {
+        "gas_m3": 11040.0,
+        "power_kwh": 39450.0
+      },
+      "2025-04": {
+        "gas_m3": 8020.0,
+        "power_kwh": 37700.0
+      },
+      "2025-05": {
+        "gas_m3": 5110.0,
+        "power_kwh": 38700.0
+      },
+      "2025-06": {
+        "gas_m3": 3020.0,
+        "power_kwh": 37600.0
+      },
+      "2025-07": {
+        "gas_m3": 2400.0,
+        "power_kwh": 38000.0
+      },
+      "2025-08": {
+        "gas_m3": 2510.0,
+        "power_kwh": 36700.0
+      },
+      "2025-09": {
+        "gas_m3": 4880.0,
+        "power_kwh": 38300.0
+      },
+      "2025-10": {
+        "gas_m3": 8130.0,
+        "power_kwh": 39600.0
+      },
+      "2025-11": {
+        "gas_m3": 11750.0,
+        "power_kwh": 38800.0
+      },
+      "2025-12": {
+        "gas_m3": 13930.0,
+        "power_kwh": 39100.0
+      }
+    }
+  },
+  "budget_contract.pdf": {
+    "supplier": "Budget Energie",
+    "contract_type": "fixed",
+    "contract_start": "2026-01-01",
+    "contract_end": "2026-12-31",
+    "fixed_on": "2025-10-03",
+    "prices_eur_mwh": {
+      "power": 89.85,
+      "gas": 49.65
+    }
+  }
+}
