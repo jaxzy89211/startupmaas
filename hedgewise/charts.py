@@ -9,6 +9,7 @@ import pandas as pd
 
 from ._types import PathOrBuffer
 from .models import POWER_FIT_DAYS, FittedModel, _power_design
+from .provenance import save_figure
 from .settings import STRESS_KEYS
 from .strategies import Analysis
 
@@ -73,7 +74,7 @@ def plot_stress(
     ax.grid(axis="y", alpha=0.25)
     if own:
         fig.tight_layout()
-        fig.savefig(path, dpi=140, format="png")
+        save_figure(fig, path, dpi=140, format="png")
         plt.close(fig)
 
 
@@ -128,7 +129,7 @@ def plot_analysis(a: Analysis, path: PathOrBuffer) -> None:
     ax.grid(alpha=0.25, axis="x")
     fig.suptitle(f"HedgeWise - {a.company.name}", fontsize=13, weight="bold")
     fig.tight_layout()
-    fig.savefig(path, dpi=130)
+    save_figure(fig, path, dpi=130)
     plt.close(fig)
 
 
@@ -211,7 +212,7 @@ def plot_frontier(
     ax.grid(alpha=0.25)
     if own:
         fig.tight_layout()
-        fig.savefig(path, dpi=140, format="png")
+        save_figure(fig, path, dpi=140, format="png")
         plt.close(fig)
 
 
@@ -241,5 +242,5 @@ def plot_fit(m: FittedModel, path: PathOrBuffer) -> None:
     for a_ in ax:
         a_.grid(alpha=0.25)
     fig.tight_layout()
-    fig.savefig(path, dpi=130)
+    save_figure(fig, path, dpi=130)
     plt.close(fig)

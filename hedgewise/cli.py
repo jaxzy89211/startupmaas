@@ -34,13 +34,13 @@ strategies and are left out on purpose.
 from __future__ import annotations
 
 import argparse
-import json
 
 import pandas as pd
 
 from .charts import plot_analysis, plot_fit, plot_stress
 from .data import demo_prices, load_prices
 from .models import describe, fit
+from .provenance import one_line, write_csv, write_json
 from .settings import DEFAULT_PATHS, DEFAULT_RISK_AVERSION, DEFAULT_SEED, OUT
 from .strategies import Analysis, analyse, recommendation_text, stress_test
 
@@ -115,8 +115,9 @@ def main(argv: list[str] | None = None) -> Analysis:
     plot_fit(m, OUT / f"fit_{tag}.png")
     if not args.demo:
         plot_stress(st_, OUT / f"stress_{tag}.png")
-    a.table.to_csv(OUT / f"strategies_{tag}.csv")
-    (OUT / f"recommendation_{tag}.json").write_text(json.dumps(a.recommendation, indent=2))
+    write_csv(a.table, OUT / f"strategies_{tag}.csv")
+    write_json(a.recommendation, OUT / f"recommendation_{tag}.json", indent=2)
+    print("Provenance: " + one_line())
     print(f"\nCharts and tables written to {OUT}/  (analysis_{tag}.png, fit_{tag}.png)")
     if args.show:
         import matplotlib.pyplot as plt

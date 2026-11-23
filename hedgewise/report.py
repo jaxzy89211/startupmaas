@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import json
 import re
 from pathlib import Path
 
@@ -27,6 +28,7 @@ from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 import hedgewise as hw
+from hedgewise import provenance
 from hedgewise._types import DateLike, PathOrBuffer
 from hedgewise.settings import DEFAULT_PATHS, DEFAULT_RISK_AVERSION, DEFAULT_SEED
 
@@ -235,6 +237,7 @@ def make_report(
         "foot": ParagraphStyle("foot", fontName=FONT, fontSize=7, leading=9, textColor=MUTED, alignment=TA_LEFT),
     }
     W = A4[0] - 3.6 * cm
+    prov = provenance.one_line()  # config hash, data hash and date range: printed in the footer
     story = []
     story.append(Paragraph(_esc(c.name), ss["title"]))  # the report title is already in the green header bar
     delivery = f"{a.delivery_start.year}"
@@ -366,14 +369,14 @@ def make_report(
         src = r.get("price_source", {})
         real = [v.split(" quoted")[0].replace("forward ", "") for v in src.values() if v.startswith("forward")]
         fixed = T["fixed_real"].format(products=", ".join(real)) if real else T["fixed_proxy"]
-        foot = Paragraph(T["footer"].format(fixed=fixed), ss["foot"])
+        foot = Paragraph(T["footer"].format(fixed=fixed) + f"<br/>{prov}", ss["foot"])
         _, fh = foot.wrap(W, 3 * cm)
         canv.setStrokeColor(colors.HexColor("#d1d5db"))
         canv.line(1.8 * cm, 1.2 * cm + fh + 4, A4[0] - 1.8 * cm, 1.2 * cm + fh + 4)
         foot.drawOn(canv, 1.8 * cm, 1.2 * cm)
         canv.restoreState()
 
-    _, foot_h = Paragraph(T["footer"].format(fixed=T["fixed_proxy"]), ss["foot"]).wrap(W, 5 * cm)
+    _, foot_h = Paragraph(T["footer"].format(fixed=T["fixed_proxy"]) + f"<br/>{prov}", ss["foot"]).wrap(W, 5 * cm)
     doc = SimpleDocTemplate(
         path,
         pagesize=A4,
@@ -382,6 +385,7 @@ def make_report(
         topMargin=1.7 * cm,
         bottomMargin=1.2 * cm + foot_h + 0.45 * cm,
         title=f"HedgeWise - {c.name}",
+        subject="HedgeWise provenance: " + json.dumps(provenance.current()),
         author="HedgeWise",
     )
     doc.build(story, onFirstPage=_page, onLaterPages=_page)

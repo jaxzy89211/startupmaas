@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 from scipy import signal
 
+from .provenance import register_data
 from .settings import DATA, DATA_START, GAS_LAG_DAYS
 
 
@@ -51,6 +52,9 @@ def load_prices(data_dir: Path = DATA) -> pd.DataFrame:
         df["co2"] = co2.reindex(idx).ffill()
         df["co2_trade"] = co2.reindex(idx).notna()
     df = df.dropna(subset=["power", "gas"])
+    from . import forwards  # a forwards file (if any) changes results, so it is part of the data hash
+
+    register_data(df, data_dir, extra_files=(forwards.FORWARDS_PATH,))
     return df
 
 
@@ -67,4 +71,5 @@ def demo_prices(seed: int = 7) -> pd.DataFrame:
     u = signal.lfilter([1], [1, -0.7], rng.standard_t(4, len(idx)) * 0.12)
     power = np.exp(1.2 + 0.75 * np.log(gas) + season + weekend + u)
     df = pd.DataFrame({"power": power, "gas": gas, "gas_trade": idx.day_of_week < 5}, index=idx)
+    register_data(df, None)
     return df

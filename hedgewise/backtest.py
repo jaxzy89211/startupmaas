@@ -33,7 +33,6 @@ Usage
 from __future__ import annotations
 
 import argparse
-import json
 import time
 
 import numpy as np
@@ -42,6 +41,7 @@ import pandas as pd
 import hedgewise as hw
 from hedgewise import company_input
 from hedgewise._types import DateLike, PathOrBuffer
+from hedgewise.provenance import one_line, save_figure, write_csv, write_json
 from hedgewise.settings import BACKTEST
 
 _B = BACKTEST  # config.yaml: backtest
@@ -303,7 +303,7 @@ def plot_pitch(results: pd.DataFrame, info: dict, year: int, company: hw.Company
     ax.set_ylim(0, max(vals + [hi]) * 1.15)
     ax.grid(axis="y", alpha=0.25)
     fig.tight_layout()
-    fig.savefig(path, dpi=150)
+    save_figure(fig, path, dpi=150)
     plt.close(fig)
 
 
@@ -351,7 +351,7 @@ def plot_all_years(results: pd.DataFrame, path: PathOrBuffer) -> None:
     ax.set_title("Total vs worst year (EUR m)")
     ax.grid(axis="x", alpha=0.25)
     fig.tight_layout()
-    fig.savefig(path, dpi=140)
+    save_figure(fig, path, dpi=140)
     plt.close(fig)
 
 
@@ -404,7 +404,7 @@ def plot_cycle(results: pd.DataFrame, typical_key: str, path: PathOrBuffer) -> N
     ax.grid(alpha=0.25, axis="y")
     ax.spines[["top", "right"]].set_visible(False)
     fig.tight_layout()
-    fig.savefig(path, dpi=150)
+    save_figure(fig, path, dpi=150)
     plt.close(fig)
 
 
@@ -446,7 +446,7 @@ def plot_calibration(info: dict, results: pd.DataFrame, path: PathOrBuffer) -> N
     ax.legend(fontsize=8, frameon=False)
     ax.grid(alpha=0.25)
     fig.tight_layout()
-    fig.savefig(path, dpi=140)
+    save_figure(fig, path, dpi=140)
     plt.close(fig)
 
 
@@ -490,10 +490,9 @@ def main(argv: list[str] | None = None) -> pd.DataFrame:
         )
     res = pd.DataFrame(rows).T
     res.index.name = "delivery_year"
-    res.to_csv(hw.OUT / "backtest_results.csv")
-    (hw.OUT / "backtest_details.json").write_text(
-        json.dumps({str(k): v for k, v in infos.items()}, indent=2, default=float)
-    )
+    write_csv(res, hw.OUT / "backtest_results.csv")
+    write_json({str(k): v for k, v in infos.items()}, hw.OUT / "backtest_details.json", indent=2, default=float)
+    print("Provenance: " + one_line())
 
     from . import forwards
 
@@ -510,7 +509,7 @@ def main(argv: list[str] | None = None) -> pd.DataFrame:
     show.loc["STDEV"] = (res.std() / 1e3).round(0).astype(int)
     show.loc["MAX JUMP"] = (res.diff().max() / 1e3).round(0).astype(int)  # biggest year-on-year increase
     stab = pd.DataFrame({"total": res.sum(), "worst_year": res.max(), "stdev": res.std(), "max_jump": res.diff().max()})
-    stab.to_csv(hw.OUT / "backtest_stability.csv")
+    write_csv(stab, hw.OUT / "backtest_stability.csv")
     print(show.to_string())
     print("\nRealised average prices (EUR/MWh):")
     for y in args.years:

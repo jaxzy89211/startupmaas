@@ -20,6 +20,7 @@ from .charts import COLORS, FRONTIER_TEXT_EN, STRAT_COLORS, plot_analysis, plot_
 from .company import Company, solar_mwh
 from .data import demo_prices, load_prices
 from .models import FittedModel, GarchT, PowerModel, describe, fit, fit_garch_t, fit_power
+from .provenance import VERSION
 from .settings import (
     ANCHOR_TO_FORWARD,
     BUDGET_MARGIN,
@@ -61,7 +62,7 @@ from .strategies import (
     tranche_dates,
 )
 
-__version__ = "0.5.0"
+__version__ = VERSION
 
 
 def main(argv: list[str] | None = None) -> Analysis:
