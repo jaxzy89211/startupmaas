@@ -28,7 +28,7 @@ def test_dutch_switch_translates_the_page():
     assert "Verwachte rekening, alles variabel" in labels and "Advies: deel vastzetten" in labels
     assert any("Zet **" in i.value for i in at.info)
     assert at.sidebar.header[0].value == "Uw bedrijf"
-    assert [t.label for t in at.tabs] == ["Risico vandaag", "Uw contracten"]
+    assert [t.label for t in at.tabs] == ["Risico vandaag", "Uw contracten", "Plan volgen"]
 
 
 def test_sector_and_upload_modes():
