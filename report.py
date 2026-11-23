@@ -54,8 +54,9 @@ TEXT = {
         "rec_effect": "With this plan: expected bill {e}, bad case {es} (instead of {es0}).",
         "tradeoff": "Each extra 10% fixed costs about <b>{a}</b> on average and removes about <b>{b}</b> "
                     "from the bad case.",
-        "stress": "<b>What if 2022 happens again?</b> (a historical stress scenario, not a forecast) "
-                  "Staying variable would cost {var}; with our recommendation {hw}.",
+        "stress": "<b>What if 2022 happens again?</b> If prices rose from today's level as much as they did from "
+                  "early 2021 to 2022, staying variable would cost {var}; with our recommendation {hw}. "
+                  "(A historical stress scenario, not a forecast.)",
         "footer": "<b>HedgeWise</b> · Assumptions: commodity cost only (no network tariffs, energy tax or supplier "
                   "margin); the fixed price is a proxy for real forward prices (recent market price + 5%); volumes are "
                   "taken as known. Scenarios come from a statistical model of past prices and can miss events "
@@ -84,8 +85,9 @@ TEXT = {
         "rec_effect": "Met dit plan: verwachte rekening {e}, slecht scenario {es} (in plaats van {es0}).",
         "tradeoff": "Elke extra 10% vastzetten kost gemiddeld ongeveer <b>{a}</b> en haalt ongeveer <b>{b}</b> "
                     "van het slechte scenario af.",
-        "stress": "<b>Wat als 2022 zich herhaalt?</b> (een historisch stressscenario, geen voorspelling) "
-                  "Variabel blijven zou {var} kosten; met ons advies {hw}.",
+        "stress": "<b>Wat als 2022 zich herhaalt?</b> Als de prijzen vanaf vandaag net zo stijgen als van begin "
+                  "2021 naar 2022, kost variabel blijven {var}; met ons advies {hw}. "
+                  "(Een historisch stressscenario, geen voorspelling.)",
         "footer": "<b>HedgeWise</b> · Aannames: alleen de kosten van de energie zelf (geen netbeheerkosten, "
                   "energiebelasting of leveranciersmarge); de vaste prijs is een benadering van echte termijnprijzen "
                   "(recente marktprijs + 5%); het verbruik wordt als bekend aangenomen. De scenario's komen uit een "

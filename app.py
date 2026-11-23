@@ -123,7 +123,10 @@ with st.spinner("Fitting GARCH-t model and simulating price scenarios ..."):
     a = hw.analyse(m, company, ds, n, 42, lam, sims=s, allow_timing=allow_timing, budget=budget)
 
 var_row, hw_row = a.table.loc["All variable"], a.table.iloc[-1]
-stress = None
+try:
+    stress = hw.stress_test(a, df)
+except ValueError:
+    stress = None
 c1, c2, c3, c4 = st.columns(4)
 c1.metric("Expected bill, all variable", f"€{var_row.expected/1e6:.2f}m")
 c2.metric("Bad case (avg worst 5%), all variable", f"€{var_row.es95/1e6:.2f}m")
@@ -147,6 +150,16 @@ except Exception as e:  # noqa: BLE001  (never let the report break the demo)
 buf = io.BytesIO()          # in memory: no shared file when several people use the demo at once
 hw.plot_analysis(a, buf)
 st.image(buf.getvalue(), width="stretch")
+
+if stress:
+    st.subheader("What if 2022 happens again?")
+    sbuf = io.BytesIO()
+    hw.plot_stress(stress, sbuf)
+    sc1, sc2 = st.columns([3, 2])
+    sc1.image(sbuf.getvalue(), width="stretch")
+    sc2.markdown(hw.stress_sentence(stress))
+    sc2.caption("A historical stress scenario, not a forecast: the monthly 2022 prices divided by the H1 2021 average, "
+                "applied to today's fixed price. The hedged share is priced at today's fixed price.")
 
 st.subheader("Strategy comparison (EUR k)")
 st.dataframe((a.table / 1e3).round(0).astype(int), width="stretch")
