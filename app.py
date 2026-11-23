@@ -469,9 +469,9 @@ def plan_tracker(T: dict, lang: str) -> None:
         h = h.set_index("run_date")[["bad_case_now", "bad_case_plan"]]
         u = money_unit(h.values.ravel(), lang)  # the unit follows the size of the bill (EUR, k, m)
         st.line_chart(
-            (h / u.div).rename(
-                columns={"bad_case_now": f"{T['tr_now']} ({u.label})", "bad_case_plan": f"{T['tr_full']} ({u.label})"}
-            )
+            (h / u.div).rename(columns={"bad_case_now": T["tr_now"], "bad_case_plan": T["tr_full"]}),
+            y_label=u.label,
+            x_label="",
         )
     else:
         st.info(T["tr_no_history"])

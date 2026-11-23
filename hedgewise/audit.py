@@ -293,11 +293,9 @@ def run_audit(
 # --------------------------------------------------------------------------------------------
 def money(x: float, lang: str = "en") -> str:
     """EUR: millions with 2 decimals from EUR 1m ('€1.23m' / '€ 1,23 mln'), else thousands ('€74k' / '€ 74.000')."""
-    if abs(x) >= 1e6:
-        return f"€{x / 1e6:.2f}m" if lang == "en" else f"€ {x / 1e6:.2f} mln".replace(".", ",")
-    if lang == "en":
-        return f"€{x / 1e3:,.0f}k"
-    return f"€ {round(x, -3):,.0f}".replace(",", ".")
+    from hedgewise.moneyfmt import money_text
+
+    return money_text(x, lang)
 
 
 def label(name: str, lang: str) -> str:

@@ -5,6 +5,8 @@ PDF library (report.py re-exports everything here)."""
 
 from __future__ import annotations
 
+from .moneyfmt import money_text
+
 TEXT = {
     "en": {
         "doc_title": "Energy price risk report",
@@ -152,12 +154,8 @@ def _num(x: float, lang: str, decimals: int = 0) -> str:
 
 
 def money(x: float, lang: str) -> str:
-    """€2.07m / € 2,07 mln for millions; €25k / € 25.000 below."""
-    if abs(x) >= 1e6:
-        return f"€{_num(x / 1e6, lang, 2)}m" if lang == "en" else f"€\u00a0{_num(x / 1e6, lang, 2)}\u00a0mln"
-    if lang == "en":
-        return f"€{_num(x / 1e3, lang, 0)}k"
-    return f"€\u00a0{_num(round(x, -3), lang, 0)}"
+    """€2.07m / € 2,07 mln for millions; €25k / € 25.000 below (see moneyfmt.money_text)."""
+    return money_text(x, lang)
 
 
 def pct(x: float) -> str:

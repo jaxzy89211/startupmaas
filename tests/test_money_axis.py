@@ -23,7 +23,7 @@ from hedgewise import audit as au  # noqa: E402
 from hedgewise import backtest as bt  # noqa: E402
 from hedgewise import green as gr  # noqa: E402
 from hedgewise import monitor as mo  # noqa: E402
-from hedgewise.moneyfmt import log_labels, money_unit, unique_labels  # noqa: E402
+from hedgewise.moneyfmt import log_labels, money_text, money_unit, unique_labels  # noqa: E402
 from hedgewise.texts import TEXT  # noqa: E402
 
 SIZES = {"small": 0.025, "medium": 0.25, "large": 2.5}  # x the default food processor (expected bill ~EUR 2m)
@@ -168,7 +168,7 @@ def test_the_helper_itself():
     assert unique_labels([2.02e6, 2.04e6, 2.06e6], m) == ["2.02", "2.04", "2.06"]
     assert unique_labels([1e6, 1.5e6, 2e6], m) == ["1.0", "1.5", "2.0"]
     assert money_unit([950], "en").label == "€" and money_unit([5e6], "nl").label == "€ mln"
-    assert m.text(2.67e6) == "€2.67m" and money_unit([132_000], "nl").text(132_400) == "€ 132.000"
+    assert m.text(2.67e6) == "€2.67m" and money_unit([132_000], "nl").text(132_400) == "€\u00a0132.000"
     assert money_unit([132_000], "en").text(132_400) == "€132k"
 
 
@@ -176,3 +176,21 @@ def test_log_axis_labels():
     m = money_unit([5e7], "en")
     assert log_labels([0.5e6, 1e6, 2e6, 1e7, 1e11], m) == ["0.5", "1", "2", "10", "100,000"]
     assert log_labels([0.5e6, 1e6], money_unit([5e7], "nl")) == ["0,5", "1"]
+
+
+def test_rounding_boundary_and_one_formatter():
+    from hedgewise import audit, texts
+
+    assert money_text(999_600) == "€1.00m" and money_text(999_400) == "€999k"
+    assert money_text(999_600, "nl") == "€\u00a01,00\u00a0mln" and money_text(950, "nl") == "€\u00a01.000"
+    assert money_unit([999_600]).label == "€ m" and money_unit([999.7]).label == "€ k"
+    for x in (950, 74_400, 2.07e6):
+        for lang in ("en", "nl"):
+            assert texts.money(x, lang) == audit.money(x, lang) == money_text(x, lang)
+
+
+def test_ticks_that_are_not_round_still_unique():
+    # not from a tick locator: values that no fixed decimals show exactly -> the fallback keeps them different
+    u = money_unit([1e6], "en")
+    assert unique_labels([1_000_001.0, 1_000_002.0, 1_003_333.3], u) == ["1.000001", "1.000002", "1.003333"]
+    assert unique_labels([1.0001e6, 1.0102e6], u) == ["1.0001", "1.0102"]  # exact at 4 decimals

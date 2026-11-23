@@ -98,3 +98,19 @@ def test_plan_tracker_tab(tmp_path, monkeypatch):
     assert any("Plan for 2027: target 55%" in m.value for m in at.markdown)
     at.radio(key="lang").set_value("NL").run()
     assert not at.exception and any("Plan voor 2027: doel 55%" in m.value for m in at.markdown)
+
+
+def test_plan_tracker_history_chart_unit(tmp_path, monkeypatch):
+    """With a monitor history, the bad-case chart's series names carry the unit that fits the amounts."""
+    import pandas as pd
+
+    from hedgewise import monitor as mo
+
+    monkeypatch.setattr(mo, "HISTORY", tmp_path)
+    pd.DataFrame(
+        {"run_date": ["2026-10-23", "2026-11-23"], "bad_case_now": [82_000, 98_500], "bad_case_plan": [61_000, 64_000]}
+    ).to_csv(tmp_path / f"{mo.slug('Bakkerij Voorbeeld (fictief)')}.csv", index=False)
+    at = _app()
+    assert not at.exception
+    charts = at.get("vega_lite_chart")
+    assert charts and any('"title": "\\u20ac k"' in c.proto.spec or '"title": "€ k"' in c.proto.spec for c in charts)

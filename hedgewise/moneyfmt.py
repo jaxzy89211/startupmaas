@@ -38,12 +38,8 @@ class MoneyUnit:
     lang: str
 
     def text(self, eur: float) -> str:
-        """An amount for a label on the chart: €2.67m / €132k / €950 (en), € 2,67 mln / € 132.000 (nl)."""
-        if self.div == 1e6:
-            return f"€{_num(eur / 1e6, 2, 'en')}m" if self.lang == "en" else f"€ {_num(eur / 1e6, 2, 'nl')} mln"
-        if self.lang == "en":
-            return f"€{_num(eur / self.div, 0, 'en')}{'k' if self.div == 1e3 else ''}"
-        return f"€ {_num(round(eur, -3) if self.div == 1e3 else eur, 0, 'nl')}"
+        """An amount for a label on the chart, in this unit: €2.67m / €132k / €950 (en), € 2,67 mln / € 132.000."""
+        return money_text(eur, self.lang, self.div)
 
     def fmt(self, eur: float, decimals: int | None = None) -> str:
         """One amount in this unit (decimals: 2 for millions, 0 otherwise, unless given)."""
@@ -51,11 +47,28 @@ class MoneyUnit:
         return _num(eur / self.div, d, self.lang)
 
 
+# amounts that ROUND to the next unit move to it: 999,600 is '€1.00m', not '€1,000k'
+M_FROM, K_FROM = 999_500.0, 999.5
+
+
+def money_text(x: float, lang: str = "en", div: float | None = None) -> str:
+    """One amount in a sentence or on a chart: '€2.07m' / '€ 2,07 mln' from EUR 1m, else '€25k' / '€ 25.000' (the
+    only formatter for money in text; div forces a unit: 1e6, 1e3 or 1)."""
+    if div is None:
+        div = 1e6 if abs(x) >= M_FROM else 1e3
+    sp = "\u00a0"
+    if div == 1e6:
+        return f"€{_num(x / 1e6, 2, 'en')}m" if lang == "en" else f"€{sp}{_num(x / 1e6, 2, 'nl')}{sp}mln"
+    if lang == "en":
+        return f"€{_num(x / div, 0, 'en')}{'k' if div == 1e3 else ''}"
+    return f"€{sp}{_num(round(x, -3) if div == 1e3 else x, 0, 'nl')}"
+
+
 def money_unit(values: Iterable[float] | float, lang: str = "en") -> MoneyUnit:
     """The unit for amounts of this size: EUR m from EUR 1m, EUR k from EUR 1,000, else EUR."""
     v = np.abs(np.asarray(list(values) if not np.isscalar(values) else [values], dtype=float))
     vmax = float(np.nanmax(v)) if v.size and np.isfinite(v).any() else 0.0
-    div = 1e6 if vmax >= 1e6 else 1e3 if vmax >= 1e3 else 1.0
+    div = 1e6 if vmax >= M_FROM else 1e3 if vmax >= K_FROM else 1.0
     return MoneyUnit(div, UNITS[lang][div], lang)
 
 
@@ -125,4 +138,4 @@ def money_axis(
     return unit
 
 
-__all__ = ["MoneyUnit", "money_unit", "unique_labels", "log_labels", "money_axis"]
+__all__ = ["MoneyUnit", "money_text", "money_unit", "unique_labels", "log_labels", "money_axis"]

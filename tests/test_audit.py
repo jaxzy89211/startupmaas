@@ -143,6 +143,7 @@ def test_sentence_never_hides_a_better_result(df, company, contracts):
     assert "Your worst year (2023, €2.00m) would have been €500k lower" in s
     assert s.endswith("In total you did better than: Fix 100% in October.")  # 3.0 < 4.2; a tie (3.0) is not "better"
     nl = au.sentence(r, "nl")
+    nl = nl.replace("\u00a0", " ")  # Dutch amounts use non-breaking spaces ('€ 3,00 mln' never wraps)
     assert "€ 3,00 mln" in nl and "€ 500.000 lager" in nl and nl.endswith(".")
     t2 = t.copy()
     t2[au.OURS] = [0.5e6, 0.9e6]  # the company beat every strategy in every year
