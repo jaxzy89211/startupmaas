@@ -36,13 +36,15 @@ def check(name: str, exp: dict) -> list[dict]:
     for month, vals in exp.get("monthly", {}).items():
         for k, want in vals.items():
             got = months.get(month, {}).get(k)
-            rows.append({"file": name, "field": f"month {k}", "expected": want, "got": got,
-                         "ok": _close(got, want, 0.5)})
+            rows.append(
+                {"file": name, "field": f"month {k}", "expected": want, "got": got, "ok": _close(got, want, 0.5)}
+            )
     prices = xt.combined_prices(ex)
     for c, want in exp.get("prices_eur_mwh", {}).items():
         got = prices.get(c, {}).get("eur_mwh")
-        rows.append({"file": name, "field": f"price {c} (EUR/MWh)", "expected": want, "got": got,
-                     "ok": _close(got, want, 0.05)})
+        rows.append(
+            {"file": name, "field": f"price {c} (EUR/MWh)", "expected": want, "got": got, "ok": _close(got, want, 0.05)}
+        )
     return rows
 
 
@@ -61,14 +63,20 @@ def per_field(df: pd.DataFrame) -> pd.DataFrame:
 if __name__ == "__main__":
     df = accuracy()
     pf = per_field(df)
-    lines = ["# Extraction accuracy on the fixture invoices (rules engine)", "",
-             "Five FAKE invoices in the layouts of publicly published Dutch bill explanations (see make_fixtures.py).",
-             "", "| Field | Correct | Checked | Accuracy |", "|---|---|---|---|"]
+    lines = [
+        "# Extraction accuracy on the fixture invoices (rules engine)",
+        "",
+        "Five FAKE invoices in the layouts of publicly published Dutch bill explanations (see make_fixtures.py).",
+        "",
+        "| Field | Correct | Checked | Accuracy |",
+        "|---|---|---|---|",
+    ]
     lines += [f"| {k} | {int(r['sum'])} | {int(r['count'])} | {r['accuracy']:.0%} |" for k, r in pf.iterrows()]
     lines += ["", f"Overall: {df.ok.sum()} of {len(df)} fields correct ({df.ok.mean():.0%})."]
     bad = df[~df.ok]
     if len(bad):
-        lines += ["", "Wrong or missing:", ""] + [f"- {r.file}: {r.field} expected {r.expected}, got {r.got}"
-                                                   for r in bad.itertuples()]
+        lines += ["", "Wrong or missing:", ""] + [
+            f"- {r.file}: {r.field} expected {r.expected}, got {r.got}" for r in bad.itertuples()
+        ]
     (HERE / "ACCURACY.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))

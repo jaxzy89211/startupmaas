@@ -262,7 +262,7 @@ def extract_rules(src: str | Path | bytes, name: str = "") -> Extraction:
             "variable" if ct.value.lower().startswith("variab") else "fixed", ct.page, ct.quote, ct.confidence
         )
     ex.prices = _price_lines(pages, num)
-    ex.monthly = _monthly_rows(pages, num, ex)
+    ex.monthly = _monthly_rows(pages, num)
     if not ex.monthly:
         ex.totals = _consumption_totals(pages, num)
         ps, pe = ex.period_start.value, ex.period_end.value
@@ -285,9 +285,9 @@ def extract_rules(src: str | Path | bytes, name: str = "") -> Extraction:
     return ex
 
 
-def _monthly_rows(pages: list[str], num: _Numbers, ex: Extraction) -> list[dict]:
-    """Monthly table rows ('januari 2025  11.850,5  34,4' under a header naming the columns and units) or, for a
-    one-month invoice, the period's totals ('Gasverbruik 142.350 m³')."""
+def _monthly_rows(pages: list[str], num: _Numbers) -> list[dict]:
+    """Monthly table rows ('januari 2025  11.850,5  34,4' under a header naming the columns and units; several power
+    columns such as normal + off-peak add up). One-month invoices are handled by _consumption_totals."""
     rows = []
     for i, text in enumerate(pages, start=1):
         cols = None  # [(commodity, unit)] from the header line
