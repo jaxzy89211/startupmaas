@@ -10,6 +10,7 @@ import pandas as pd
 import streamlit as st
 
 import hedgewise as hw
+from hedgewise import audit as au
 from hedgewise import company_input as ci
 from hedgewise.naming import report_path
 from hedgewise.settings import APP, DEFAULT_RISK_AVERSION, DEFAULT_SEED
@@ -45,13 +46,13 @@ def stress_png(key: tuple, _stress: dict) -> bytes:
     return buf.getvalue()
 
 
-def report_pdf(a: hw.Analysis, lang: str, stress: dict | None) -> bytes:
+def report_pdf(a: hw.Analysis, lang: str, stress: dict | None, audit: object | None = None) -> bytes:
     """The one-page PDF. Called only when someone clicks "Download" (Streamlit runs it on a separate thread,
     outside the page script, so no Streamlit calls or caches in here); reportlab is imported only then."""
     from hedgewise import report
 
     buf = io.BytesIO()
-    report.make_report(a, buf, lang, stress=stress)
+    report.make_report(a, buf, lang, stress=stress, audit=audit)
     return buf.getvalue()
 
 
@@ -184,84 +185,207 @@ with st.sidebar:
     allow_timing = st.checkbox("Allow fixing everything at once (market timing)", False)
     n = st.select_slider("Scenarios", APP["scenario_choices"], APP["default_scenarios"])
 
-ds = str(pd.Timestamp(year=pd.Timestamp(as_of).year + 1, month=1, day=1).date())
-with st.spinner("Fitting GARCH-t model and simulating price scenarios ..."):
-    m = fitted(as_of)
-    s = sims(as_of, ds, n, DEFAULT_SEED)
-    a = hw.analyse(m, company, ds, n, DEFAULT_SEED, lam, sims=s, allow_timing=allow_timing, budget=budget)
-# everything that changes the analysis: used as the cache key for the charts and the PDF
-key = (as_of, ds, n, lam, budget, allow_timing, company.name, company.gas_m3, company.power_kwh, company.solar_kwp)
+tab_today, tab_audit = st.tabs(["Today's risk", "Your past contracts / Uw contracten"])
 
-var_row, hw_row = a.table.loc["All variable"], a.table.iloc[-1]
-try:
-    stress = hw.stress_test(a, df)
-except ValueError:
-    stress = None
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Expected bill, all variable", f"€{var_row.expected / 1e6:.2f}m")
-c2.metric("Bad case (avg worst 5%), all variable", f"€{var_row.es95 / 1e6:.2f}m")
-c3.metric(
-    "Bad case with HedgeWise",
-    f"€{hw_row.es95 / 1e6:.2f}m",
-    delta=f"-€{(var_row.es95 - hw_row.es95) / 1e6:.2f}m",
-    delta_color="inverse",
-)
-rg, rp = a.recommendation["hedge_gas"], a.recommendation["hedge_power"]
-c4.metric("Recommended share to fix", f"{rg:.0%}" if np.isclose(rg, rp) else f"gas {rg:.0%} · power {rp:.0%}")
+with tab_today:
+    ds = str(pd.Timestamp(year=pd.Timestamp(as_of).year + 1, month=1, day=1).date())
+    with st.spinner("Fitting GARCH-t model and simulating price scenarios ..."):
+        m = fitted(as_of)
+        s = sims(as_of, ds, n, DEFAULT_SEED)
+        a = hw.analyse(m, company, ds, n, DEFAULT_SEED, lam, sims=s, allow_timing=allow_timing, budget=budget)
+    # everything that changes the analysis: used as the cache key for the charts and the PDF
+    key = (as_of, ds, n, lam, budget, allow_timing, company.name, company.gas_m3, company.power_kwh, company.solar_kwp)
 
-st.info(hw.recommendation_text(a).replace("\n", "  \n"))
+    var_row, hw_row = a.table.loc["All variable"], a.table.iloc[-1]
+    try:
+        stress = hw.stress_test(a, df)
+    except ValueError:
+        stress = None
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Expected bill, all variable", f"€{var_row.expected / 1e6:.2f}m")
+    c2.metric("Bad case (avg worst 5%), all variable", f"€{var_row.es95 / 1e6:.2f}m")
+    c3.metric(
+        "Bad case with HedgeWise",
+        f"€{hw_row.es95 / 1e6:.2f}m",
+        delta=f"-€{(var_row.es95 - hw_row.es95) / 1e6:.2f}m",
+        delta_color="inverse",
+    )
+    rg, rp = a.recommendation["hedge_gas"], a.recommendation["hedge_power"]
+    c4.metric("Recommended share to fix", f"{rg:.0%}" if np.isclose(rg, rp) else f"gas {rg:.0%} · power {rp:.0%}")
 
-rc1, rc2, _ = st.columns([1, 2, 3])
-rep_lang = rc1.radio("Report language", ["EN", "NL"], horizontal=True)
-rc2.download_button(
-    "Download report (PDF)",
-    lambda: report_pdf(a, rep_lang.lower(), stress),  # built on click, not on every rerun
-    type="primary",
-    file_name=report_path(company.name, m.as_of).name,
-    mime="application/pdf",
-)
+    st.info(hw.recommendation_text(a).replace("\n", "  \n"))
 
-st.image(analysis_png(key, a), width="stretch")
-st.caption("Bottom left, the trade-off chart: " + hw.frontier_scale_sentence(a, "en"))
+    rc1, rc2, _ = st.columns([1, 2, 3])
+    rep_lang = rc1.radio("Report language", ["EN", "NL"], horizontal=True)
+    # page 2 with the past-contracts audit, if one was run for this same consumption profile
+    prev_audit = st.session_state.get("audit_result")
+    audit_page = None
+    if prev_audit is not None and prev_audit[0] == (company.gas_m3, company.power_kwh, company.solar_kwp):
+        if rc1.checkbox("Add page 2: your past contracts", True):
+            audit_page = prev_audit[1]
+    rc2.download_button(
+        "Download report (PDF)",
+        lambda: report_pdf(a, rep_lang.lower(), stress, audit_page),  # built on click, not on every rerun
+        type="primary",
+        file_name=report_path(company.name, m.as_of).name,
+        mime="application/pdf",
+    )
 
-if stress:
-    st.subheader("What if 2022 happens again?")
-    sc1, sc2 = st.columns([3, 2])
-    sc1.image(stress_png(key, stress), width="stretch")
-    for sc in stress["scenarios"]:
-        b, p = sc["bills"], sc["avg_price"]
-        sc2.markdown(
-            f"**{sc['label']['en']}** (gas avg €{p['gas']:.0f}, power €{p['power']:.0f}/MWh): "
-            f"all variable €{b['All variable'] / 1e6:.2f}m · HedgeWise plan €{b['HedgeWise'] / 1e6:.2f}m · "
-            f"fix 100% €{b['Fix 100% now'] / 1e6:.2f}m"
+    st.image(analysis_png(key, a), width="stretch")
+    st.caption("Bottom left, the trade-off chart: " + hw.frontier_scale_sentence(a, "en"))
+
+    if stress:
+        st.subheader("What if 2022 happens again?")
+        sc1, sc2 = st.columns([3, 2])
+        sc1.image(stress_png(key, stress), width="stretch")
+        for sc in stress["scenarios"]:
+            b, p = sc["bills"], sc["avg_price"]
+            sc2.markdown(
+                f"**{sc['label']['en']}** (gas avg €{p['gas']:.0f}, power €{p['power']:.0f}/MWh): "
+                f"all variable €{b['All variable'] / 1e6:.2f}m · HedgeWise plan €{b['HedgeWise'] / 1e6:.2f}m · "
+                f"fix 100% €{b['Fix 100% now'] / 1e6:.2f}m"
+            )
+        sc2.caption(
+            "Historical stress scenarios, not forecasts. (a) The realised 2022 monthly prices exactly as they were. "
+            "(b) Today's fixed price × (2022 average / 2021 average) per commodity, with the 2022 monthly shape. "
+            "The hedged share is priced at today's fixed price."
         )
-    sc2.caption(
-        "Historical stress scenarios, not forecasts. (a) The realised 2022 monthly prices exactly as they were. "
-        "(b) Today's fixed price × (2022 average / 2021 average) per commodity, with the 2022 monthly shape. "
-        "The hedged share is priced at today's fixed price."
-    )
 
-st.subheader("Strategy comparison (EUR k)")
-st.dataframe((a.table / 1e3).round(0).astype(int), width="stretch")
+    st.subheader("Strategy comparison (EUR k)")
+    st.dataframe((a.table / 1e3).round(0).astype(int), width="stretch")
 
-if pd.Timestamp(ds) + pd.DateOffset(years=1) <= df.index.max():
-    real = {c: df.loc[ds : str(pd.Timestamp(ds).year) + "-12-31", c] for c in ("gas", "power")}
-    rb = sum(
-        float(v @ real[c].groupby(real[c].index.month).mean().values)
-        for c, v in (("gas", company.gas_mwh), ("power", company.power_mwh))
-    )
-    st.warning(
-        f"What actually happened: the all-variable bill for {pd.Timestamp(ds).year} was "
-        f"**€{rb / 1e6:.2f}m** (model expected €{var_row.expected / 1e6:.2f}m, bad case €{var_row.es95 / 1e6:.2f}m)."
-    )
+    if pd.Timestamp(ds) + pd.DateOffset(years=1) <= df.index.max():
+        real = {c: df.loc[ds : str(pd.Timestamp(ds).year) + "-12-31", c] for c in ("gas", "power")}
+        rb = sum(
+            float(v @ real[c].groupby(real[c].index.month).mean().values)
+            for c, v in (("gas", company.gas_mwh), ("power", company.power_mwh))
+        )
+        st.warning(
+            f"What actually happened: the all-variable bill for {pd.Timestamp(ds).year} was "
+            f"**€{rb / 1e6:.2f}m** (model expected €{var_row.expected / 1e6:.2f}m, "
+            f"bad case €{var_row.es95 / 1e6:.2f}m)."
+        )
 
-with st.expander("Model details"):
-    st.code(hw.describe(m))
-    src = a.recommendation["price_source"]
-    st.markdown("**Fixed prices used:** " + "; ".join(f"{k} €{a.fwd_now[k]:.1f}/MWh ({v})" for k, v in src.items()))
-    st.caption(
-        "Commodity cost only (no network tariffs, energy tax or supplier margin). Without data/forwards.csv the "
-        "fixed price is a stand-in for real forward prices: 30-day average spot (power seasonally adjusted) + 5%. "
-        "The simulated price level is anchored to the fixed price (minus the premium); the model supplies the "
-        "risk around it."
+    with st.expander("Model details"):
+        st.code(hw.describe(m))
+        src = a.recommendation["price_source"]
+        st.markdown("**Fixed prices used:** " + "; ".join(f"{k} €{a.fwd_now[k]:.1f}/MWh ({v})" for k, v in src.items()))
+        st.caption(
+            "Commodity cost only (no network tariffs, energy tax or supplier margin). Without data/forwards.csv the "
+            "fixed price is a stand-in for real forward prices: 30-day average spot (power seasonally adjusted) + 5%. "
+            "The simulated price level is anchored to the fixed price (minus the premium); the model supplies the "
+            "risk around it."
+        )
+
+
+# --------------------------------------------------------------------------------------------
+# Tab 2: procurement audit ("what would HedgeWise have saved you?")
+# --------------------------------------------------------------------------------------------
+@st.cache_data(show_spinner=False, max_entries=16)
+def audit_strategies(gas_m3: tuple, power_kwh: tuple, solar_kwp: float, last_year: int) -> pd.DataFrame:
+    """The comparison strategies for this consumption profile (slow: re-fits at every decision date; cached)."""
+    comp = hw.Company(name="audit", gas_m3=gas_m3, power_kwh=power_kwh, solar_kwp=solar_kwp)
+    return au.strategy_costs(comp, last_year, load())
+
+
+AUDIT_TXT = {
+    "en": {
+        "intro": "Enter what you actually bought per delivery year: the share fixed, the price and its unit, and "
+        "(optional) the date you fixed. Write **variable** as the price for a share you left variable. Prices "
+        "**without** energy tax, network costs and VAT. Your consumption profile comes from the sidebar.",
+        "upload": "... or upload a table (CSV / Excel: year, commodity, share, price, unit, fixed_on)",
+        "run": "Compare with the strategies",
+        "wait": "Running the strategies on real prices (each decision re-fits the model; about a minute) ...",
+        "table": "Realised commodity cost per year (EUR k)",
+        "total": "TOTAL",
+        "worst": "WORST YEAR",
+        "detail": "How your cost was computed",
+        "proxy": "Your fixed prices vs the market proxy (30-day spot + 5%) on the day you fixed, EUR/MWh",
+        "note": "Same rules and real prices as the backtest (RESULTS.md). The strategies are not tuned to your data. "
+        "The HedgeWise ladder was designed after seeing 2021-2025, so its numbers are not independent evidence.",
+    },
+    "nl": {
+        "intro": "Vul in wat u echt heeft ingekocht per leveringsjaar: het vastgezette aandeel, de prijs en de "
+        "eenheid, en (optioneel) de datum waarop u vastzette. Schrijf **variabel** als prijs voor een deel dat "
+        "variabel bleef. Prijzen **zonder** energiebelasting, netkosten en btw. Uw verbruiksprofiel komt uit de "
+        "zijbalk.",
+        "upload": "... of upload een tabel (CSV / Excel: jaar, product, aandeel, prijs, eenheid, datum)",
+        "run": "Vergelijk met de strategieën",
+        "wait": "Strategieën doorrekenen op echte prijzen (elk besluit fit het model opnieuw; ongeveer een minuut) ...",
+        "table": "Gerealiseerde energiekosten per jaar (EUR k)",
+        "total": "TOTAAL",
+        "worst": "DUURSTE JAAR",
+        "detail": "Hoe uw kosten zijn berekend",
+        "proxy": "Uw vaste prijzen vs de marktprijs-benadering (30-daags spot + 5%) op de dag van vastzetten, EUR/MWh",
+        "note": "Zelfde regels en echte prijzen als de backtest (RESULTS.md). De strategieën zijn niet afgestemd op uw "
+        "data. De HedgeWise-ladder is ontworpen na het zien van 2021-2025; die cijfers zijn dus geen onafhankelijk "
+        "bewijs.",
+    },
+}
+
+with tab_audit:
+    alang = st.radio("Language / Taal", ["EN", "NL"], horizontal=True, key="audit_lang").lower()
+    T = AUDIT_TXT[alang]
+    st.markdown(T["intro"])
+    example = au.read_contracts(hw.DATA / "audit_example.csv")
+    default_rows = pd.DataFrame(
+        [
+            {
+                "year": k.year,
+                "commodity": k.commodity,
+                "share_%": round(k.share * 100) if k.price_eur_mwh is not None else None,
+                "price": k.price_entered.split(" ")[0],
+                "unit": k.price_entered.split(" ", 1)[1] if " " in k.price_entered else "",
+                "fixed_on": "" if k.fixed_on is None else str(k.fixed_on.date()),
+            }
+            for k in example
+        ]
     )
+    up_c = st.file_uploader(T["upload"], type=["csv", "txt", "xlsx", "xls"], key="audit_upload")
+    if up_c is not None:
+        try:
+            default_rows = ci.read_table(up_c)
+        except Exception as e:  # noqa: BLE001
+            st.error(str(e))
+    edited = st.data_editor(
+        default_rows,
+        num_rows="dynamic",
+        width="stretch",
+        key="audit_table",
+        column_config={
+            "commodity": st.column_config.SelectboxColumn(options=["gas", "power"]),
+            "unit": st.column_config.SelectboxColumn(options=au.PRICE_UNITS + [""]),
+        },
+    )
+    if st.button(T["run"], type="primary"):
+        st.session_state["audit_go"] = True
+    if st.session_state.get("audit_go"):
+        try:
+            tbl = edited.copy()
+            if "share_%" in tbl:  # the editor's column is in percent; an uploaded table keeps its own format
+                tbl["share"] = [None if pd.isna(v) or v == "" else f"{v}%" for v in tbl.pop("share_%")]
+            contracts = au.read_contracts(tbl)
+            years = au.audited_years(contracts, df)
+        except ValueError as e:
+            st.error(str(e))
+            st.stop()
+        with st.spinner(T["wait"]):
+            strat = audit_strategies(company.gas_m3, company.power_kwh, company.solar_kwp, max(years))
+        r = au.run_audit(contracts, company, df, strategies=strat)
+        st.success(au.sentence(r, alang))
+        show = (r.table / 1e3).round(0).astype(int)
+        show.loc[T["total"]] = (r.table.sum() / 1e3).round(0).astype(int)
+        show.loc[T["worst"]] = (r.table.max() / 1e3).round(0).astype(int)
+        show.columns = [au.label(c, alang) for c in show.columns]
+        st.subheader(T["table"])
+        st.dataframe(show, width="stretch")
+        buf = io.BytesIO()
+        au.plot_audit(r, buf, alang)
+        st.image(buf.getvalue(), width="stretch")
+        st.caption(T["note"])
+        with st.expander(T["detail"]):
+            st.dataframe(r.detail.round(2), width="stretch", hide_index=True)
+            if r.contracts.fixed_on.notna().any():
+                st.caption(T["proxy"])
+                st.dataframe(r.contracts.dropna(subset=["fixed_on"]).round(1), width="stretch", hide_index=True)
+        st.session_state["audit_result"] = ((company.gas_m3, company.power_kwh, company.solar_kwp), r)
