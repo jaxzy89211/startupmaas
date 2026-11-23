@@ -66,11 +66,11 @@ TEXT = {
         "solar": " · Rooftop solar: {kwp} kWp",
         "bill_h": "Your bill next year if you stay variable",
         "expected_lbl": "Expected",
-        "bad_lbl": "Bad case<br/><font size=8>average of the worst 5% of scenarios</font>",
+        "bad_lbl": "Bad case <font size=8>(average of the worst 5% of scenarios)</font>",
         "bill_note": "Gas and electricity commodity cost only, based on {n} simulated price scenarios.",
         "chart_h": "How much to fix: every option at a glance",
-        "chart_note": "Each dot is a share of next year's energy fixed today (0% to 100%). Further left = a less painful "
-                      "bad year; higher = more expensive on average. The star is our recommendation.",
+        "chart_note": "Each dot = a share of next year's energy fixed now. Left = a milder bad year; "
+                      "up = dearer on average. Star = our advice.",
         "rec_h": "Our recommendation",
         "rec": "Fix <b>{h}</b> of next year's gas and electricity, spread over <b>{k} monthly {tranche_word}</b>; "
                "start with <b>{m}</b> this month.",
@@ -82,7 +82,8 @@ TEXT = {
         "stress_h": "What if 2022 happens again?",
         "stress_sc": "<b>{label}</b> (gas avg {gas}, power {power} per MWh): staying variable {var}; "
                      "with our recommendation {hw}.",
-        "stress_note": "Historical stress scenarios, not forecasts. The fixed share is priced at today's fixed price.",
+        "stress_note": "Historical stress scenarios, not forecasts. Left: 2022 monthly prices as they were. Right: "
+                       "today's fixed price × (2022 avg ÷ 2021 avg), 2022 monthly pattern. Fixed share at today's price.",
         "footer": "<b>HedgeWise</b> · Assumptions: commodity cost only (no network tariffs, energy tax or supplier "
                   "margin); {fixed}; volumes are "
                   "taken as known. Scenarios come from a statistical model of past prices and can miss events "
@@ -99,12 +100,11 @@ TEXT = {
         "solar": " · Zonnepanelen: {kwp} kWp",
         "bill_h": "Uw rekening volgend jaar als u variabel blijft",
         "expected_lbl": "Verwacht",
-        "bad_lbl": "Slecht scenario<br/><font size=8>gemiddelde van de 5% duurste scenario's</font>",
+        "bad_lbl": "Slecht scenario <font size=8>(gem. van de 5% duurste scenario's)</font>",
         "bill_note": "Alleen de kosten van gas en elektriciteit zelf, op basis van {n} gesimuleerde prijsscenario's.",
         "chart_h": "Hoeveel vastzetten: alle opties in één oogopslag",
-        "chart_note": "Elk punt is een deel van het energieverbruik van volgend jaar dat u nu vastzet (0% tot 100%). "
-                      "Verder naar links = een minder pijnlijk slecht jaar; hoger = gemiddeld duurder. "
-                      "De ster is ons advies.",
+        "chart_note": "Elk punt = een deel van volgend jaar dat u nu vastzet. Links = een milder slecht jaar; "
+                      "hoger = gemiddeld duurder. Ster = ons advies.",
         "rec_h": "Ons advies",
         "rec": "Zet <b>{h}</b> van het gas en de elektriciteit voor volgend jaar vast, verdeeld over "
                "<b>{k} maandelijkse {tranche_word}</b>; begin deze maand met <b>{m}</b>.",
@@ -116,7 +116,8 @@ TEXT = {
         "stress_h": "Wat als 2022 zich herhaalt?",
         "stress_sc": "<b>{label}</b> (gas gem. {gas}, stroom {power} per MWh): variabel blijven {var}; "
                      "met ons advies {hw}.",
-        "stress_note": "Historische stressscenario's, geen voorspellingen. Het vaste deel tegen de vaste prijs van nu.",
+        "stress_note": "Historische stressscenario's, geen voorspellingen. Links: maandprijzen 2022 zoals ze waren. "
+                       "Rechts: vaste prijs nu × (gem. 2022 ÷ gem. 2021), maandpatroon 2022. Vast deel tegen de prijs van nu.",
         "footer": "<b>HedgeWise</b> · Aannames: alleen de kosten van de energie zelf (geen netbeheerkosten, "
                   "energiebelasting of leveranciersmarge); {fixed}; het verbruik wordt als bekend aangenomen. De scenario's komen uit een "
                   "statistisch model van prijzen uit het verleden en kunnen gebeurtenissen missen die nog nooit "
@@ -198,18 +199,18 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
                                 spaceAfter=3),
         "sub": ParagraphStyle("sub", fontName=FONT, fontSize=8.5, leading=11, textColor=MUTED),
         "h": ParagraphStyle("h", fontName=FONT_BOLD, fontSize=11, leading=14, textColor=BRAND,
-                            spaceBefore=7, spaceAfter=3),
-        "body": ParagraphStyle("body", fontName=FONT, fontSize=9.5, leading=13, textColor=INK),
+                            spaceBefore=5, spaceAfter=2),
+        "body": ParagraphStyle("body", fontName=FONT, fontSize=9, leading=12.5, textColor=INK),
         "small": ParagraphStyle("small", fontName=FONT, fontSize=8, leading=10.5, textColor=MUTED),
-        "big": ParagraphStyle("big", fontName=FONT_BOLD, fontSize=20, leading=24, textColor=INK),
+        "big": ParagraphStyle("big", fontName=FONT_BOLD, fontSize=18, leading=21, textColor=INK),
         "lbl": ParagraphStyle("lbl", fontName=FONT, fontSize=9.5, leading=12, textColor=INK),
-        "rec": ParagraphStyle("rec", fontName=FONT, fontSize=11, leading=15, textColor=INK),
+        "rec": ParagraphStyle("rec", fontName=FONT, fontSize=10.5, leading=14, textColor=INK),
         "foot": ParagraphStyle("foot", fontName=FONT, fontSize=7, leading=9, textColor=MUTED,
                                alignment=TA_LEFT),
     }
     W = A4[0] - 3.6 * cm
     story = []
-    story.append(Paragraph(f"{T['doc_title']}: {_esc(c.name)}", ss["title"]))
+    story.append(Paragraph(_esc(c.name), ss["title"]))   # the report title is already in the green header bar
     delivery = f"{a.delivery_start.year}"
     story.append(Paragraph(T["prepared"].format(today=date_str(today, lang), as_of=date_str(a.model.as_of, lang),
                                                 delivery=delivery), ss["sub"]))
@@ -232,8 +233,8 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
     tb.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), FONT), ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f3f4f6")),
                             ("BACKGROUND", (1, 0), (1, -1), RED_SOFT),
                             ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                            ("LEFTPADDING", (0, 0), (-1, -1), 10), ("TOPPADDING", (0, 0), (-1, -1), 6),
-                            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+                            ("LEFTPADDING", (0, 0), (-1, -1), 10), ("TOPPADDING", (0, 0), (-1, -1), 4),
+                            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
                             ("LINEAFTER", (0, 0), (0, -1), 3, colors.white)]))
     story.append(tb)
     story.append(Spacer(1, 2))
@@ -245,14 +246,14 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    fig, ax = plt.subplots(figsize=(8.2, 4.1))
+    fig, ax = plt.subplots(figsize=(8.2, 2.9))
     hw.plot_frontier(a, ax, text=T["chart"], show_tradeoff=False)
     ax.set_title("")
     fig.tight_layout()
     fig.savefig(buf, format="png", dpi=200)
     plt.close(fig)
     buf.seek(0)
-    story.append(Image(buf, width=W, height=W * 4.1 / 8.2))
+    story.append(Image(buf, width=W, height=W * 2.9 / 8.2))
     story.append(Paragraph(T["chart_note"], ss["small"]))
 
     # recommendation
@@ -268,21 +269,24 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
                  Paragraph(T["rec_effect"].format(e=money(hw_row.expected, lang), es=money(hw_row.es95, lang),
                                                   es0=money(var_row.es95, lang)), ss["body"]),
                  Paragraph(T["tradeoff"].format(a=money(d_e, lang), b=money(d_es, lang)), ss["body"])]
-    if stress:
-        rec_parts.append(Spacer(1, 3))
-        rec_parts.append(Paragraph(f"<b>{T['stress_h']}</b>", ss["body"]))
-        for sc in stress["scenarios"]:
-            p = sc["avg_price"]
-            rec_parts.append(Paragraph(T["stress_sc"].format(
-                label=sc["label"][lang], gas=_eur0(p["gas"], lang), power=_eur0(p["power"], lang),
-                var=money(sc["bills"]["All variable"], lang), hw=money(sc["bills"]["HedgeWise"], lang)), ss["body"]))
-        rec_parts.append(Paragraph(T["stress_note"], ss["small"]))
     box = Table([[rec_parts]], colWidths=[W])
     box.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), FONT), ("BACKGROUND", (0, 0), (-1, -1), SOFT),
                              ("LINEBEFORE", (0, 0), (0, -1), 4, BRAND),
                              ("LEFTPADDING", (0, 0), (-1, -1), 12), ("RIGHTPADDING", (0, 0), (-1, -1), 10),
                              ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 9)]))
     story.append(box)
+
+    if stress:   # small stress chart in the bottom part of the page
+        story.append(Paragraph(T["stress_h"], ss["h"]))
+        sbuf = io.BytesIO()
+        fig, ax = plt.subplots(figsize=(8.2, 2.45))
+        hw.plot_stress(stress, ax=ax, lang=lang, compact=True)
+        fig.tight_layout(pad=0.4)
+        fig.savefig(sbuf, format="png", dpi=200)
+        plt.close(fig)
+        sbuf.seek(0)
+        story.append(Image(sbuf, width=W, height=W * 2.45 / 8.2))
+        story.append(Paragraph(T["stress_note"], ss["small"]))
 
     def _page(canv, doc):
         canv.saveState()
@@ -303,8 +307,9 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
         foot.drawOn(canv, 1.8 * cm, 1.2 * cm)
         canv.restoreState()
 
+    _, foot_h = Paragraph(T["footer"].format(fixed=T["fixed_proxy"]), ss["foot"]).wrap(W, 5 * cm)
     doc = SimpleDocTemplate(path, pagesize=A4, leftMargin=1.8 * cm, rightMargin=1.8 * cm,
-                            topMargin=1.7 * cm, bottomMargin=3.0 * cm,
+                            topMargin=1.7 * cm, bottomMargin=1.2 * cm + foot_h + 0.45 * cm,
                             title=f"HedgeWise - {c.name}", author="HedgeWise")
     doc.build(story, onFirstPage=_page, onLaterPages=_page)
     if doc.page != 1:

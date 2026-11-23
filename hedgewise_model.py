@@ -703,7 +703,9 @@ def plot_stress(s: dict, path=None, ax=None, lang: str = "en", compact: bool = F
     ax.set_ylim(0, top * 1.22)
     ax.set_ylabel("€ m" if lang == "en" else "€ mln", fontsize=fs)
     ax.tick_params(axis="y", labelsize=fs)
-    ax.legend(fontsize=fs - 0.5, frameon=False, ncol=4 if not compact else 2, loc="upper center")
+    # legend in the empty top-left corner (the "repeat" bars are lower than the "shock" bars)
+    ax.legend(fontsize=fs - 0.5, frameon=False, ncol=4 if not compact else 2,
+              loc="upper center" if not compact else "upper left")
     if not compact:
         ax.set_title("What if 2022 happens again? (historical stress scenarios, not forecasts)" if lang == "en"
                      else "Wat als 2022 zich herhaalt? (historische stressscenario's, geen voorspellingen)", fontsize=11)
