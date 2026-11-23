@@ -1,6 +1,39 @@
-# HedgeWise model (v0.6)
+# HedgeWise model (v0.7)
 
 Energy price-risk model for mid-sized Dutch companies: **consumption in → worst-case bill and hedge recommendation out.**
+
+## How it fits together
+
+```mermaid
+flowchart LR
+    subgraph Data
+        P[Power day-ahead<br/>Energy-Charts NL/DE/BE] --> D[(data/)]
+        G[TTF gas<br/>Yahoo] --> D
+        F[Forwards EEX/ICE<br/>optional] --> D
+        CBS[CBS StatLine] --> C[(data/cbs/)]
+    end
+    B[Company bills<br/>or yearly totals] --> CI[company_input]
+    D --> M[models: GARCH-t gas,<br/>power regression, correlation]
+    M --> S[simulate: 10,000 daily paths]
+    S --> A[strategies.analyse:<br/>anchoring, frontier, advice]
+    CI --> A
+    A --> ST[stress test 2022]
+    A --> GR[green: solar, battery, PPA]
+    A --> R[report.py PDF EN/NL]
+    A --> APP[app.py dashboard<br/>+ interview mode]
+    ST --> R
+    GR --> R
+    D --> BT[backtest.py 2021-2025<br/>re-fit at every decision]
+    D --> AU[audit.py past contracts]
+    AU --> R
+    D --> V[validation.py<br/>out-of-sample]
+    M --> RB[robustness.py<br/>synthetic futures]
+    C --> MK[market.py]
+    BT --> RES[RESULTS.md]
+    V --> RES
+    RB --> RES
+    MK --> MKT[MARKET.md]
+```
 
 ## Quick start
 
@@ -18,7 +51,7 @@ python validation.py               # out-of-sample model validation (~1-2 min) -
 python market.py                  # market size from CBS open data -> MARKET.md numbers (--offline: data/cbs/ snapshot)
 python robustness.py --histories 200   # synthetic 8-year futures (~25 min on 4 cores; resumable, see below)
 python download_data.py --extended && python backtest.py --market DE-LU --years 2020 2021 2022 2023 2024 2025
-streamlit run app.py               # live demo dashboard in the browser
+streamlit run app.py               # live demo dashboard in the browser (?lang=nl&mode=interview for interviews)
 python -m pytest -q --cov          # tests + coverage (pip install -r requirements-dev.txt)
 ruff check . && ruff format --check .   # lint
 ```
@@ -50,6 +83,8 @@ below works as before. When imported (`import backtest`, `import hedgewise_model
 | `hedgewise/green.py` | Green investments as a hedge: hourly prices inside each simulated month (real day profiles × simulated monthly level), rooftop solar (self-consumption vs export at 80% of day-ahead), a battery (daily cycle + peak shaving), a PPA; their effect on the expected and bad-case bill, payback in normal vs crisis scenarios, extra points on the trade-off chart. Assumptions in `config.yaml` (`green`) |
 | `hedgewise/audit.py` | Procurement audit ("what would HedgeWise have saved you?"): past contracts per delivery year (share, price in EUR/MWh, ct/kWh, EUR/kWh, EUR/GJ or EUR/m³, optional date fixed; partial years allowed) vs all variable, fix 100% in October, 60% tranches, the 2-year ladder and the HedgeWise ladder, on real prices with the backtest's rules. Template: `data/audit_example.csv` (made-up company). App tab "Your past contracts" (EN/NL), optional PDF page 2 |
 | `hedgewise/market.py`, `MARKET.md` | Market size from CBS StatLine (tables 81589NED, 81578NED, 83583NED, 83989NED; snapshot in `data/cbs/` for offline runs): target companies NL and Limburg, their energy use and spend, revenue at 1/5/10% adoption |
+| `hedgewise/app_text.py`, `hedgewise/texts.py` | Every dashboard text in English and Dutch; the PDF's sentences and number formats (shared by app and PDF) |
+| `TEAM_GUIDE.md`, `tools/screenshots.py` | Guide for the (non-coding) team: interviews, what the numbers mean, allowed claims, 15 hard questions; screenshots made with headless Chrome |
 | `hedgewise/robustness.py` | Strategies on synthetic 8-year futures (model, block bootstrap, 3 named stress paths). Runs in chunks of 20 histories, each saved to `output/robustness_chunks/` as soon as it finishes (git-ignored); rerunning the same command resumes, and at most 4 worker processes are used |
 | `hedgewise/provenance.py` | Writes config hash, data hashes and data date range into every output |
 | `hedgewise/settings.py`, `config.py`, `naming.py`, `cli.py`, `_types.py` | Settings from config, config loader, output names, model CLI, type aliases |

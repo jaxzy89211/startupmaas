@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from matplotlib.figure import Figure
 
 HASH_CHARS = 12
-VERSION = "0.5.0"
+VERSION = "0.7.0"
 PRICE_FILES = ("gas_ttf.csv", "power_nl_daily.csv", "co2_eua.csv", "forwards.csv", "forwards.xlsx")
 
 _current: dict[str, Any] = {}
@@ -77,7 +77,7 @@ def current() -> dict[str, Any]:
 
 
 def one_line(p: dict[str, Any] | None = None) -> str:
-    """Compact text form, e.g. 'config 1a2b3c4d5e6f · data 9f8e7d6c5b4a (2019-01-01..2026-11-23) · v0.5.0'."""
+    """Compact text form, e.g. 'config 1a2b3c4d5e6f · data 9f8e7d6c5b4a (2019-01-01..2026-11-23) · v0.7.0'."""
     p = p or current()
     rng = f" ({p['data_from']}..{p['data_to']})" if p.get("data_from") else ""
     data = f" · data {p['data_hash']}{rng}" if "data_hash" in p else ""
