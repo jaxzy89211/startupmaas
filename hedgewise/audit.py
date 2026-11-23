@@ -292,8 +292,12 @@ def run_audit(
 # Text and chart
 # --------------------------------------------------------------------------------------------
 def money(x: float, lang: str = "en") -> str:
-    """EUR millions with 2 decimals: '€1.23m' (en) / '€ 1,23 mln' (nl)."""
-    return f"€{x / 1e6:.2f}m" if lang == "en" else f"€ {x / 1e6:.2f} mln".replace(".", ",")
+    """EUR: millions with 2 decimals from EUR 1m ('€1.23m' / '€ 1,23 mln'), else thousands ('€74k' / '€ 74.000')."""
+    if abs(x) >= 1e6:
+        return f"€{x / 1e6:.2f}m" if lang == "en" else f"€ {x / 1e6:.2f} mln".replace(".", ",")
+    if lang == "en":
+        return f"€{x / 1e3:,.0f}k"
+    return f"€ {round(x, -3):,.0f}".replace(",", ".")
 
 
 def label(name: str, lang: str) -> str:

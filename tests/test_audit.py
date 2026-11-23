@@ -140,14 +140,14 @@ def test_sentence_never_hides_a_better_result(df, company, contracts):
     r = au.AuditResult(t, pd.DataFrame(), pd.DataFrame())
     s = au.sentence(r)
     assert s.startswith("You paid €3.00m over 2022-2023; the 2-year ladder would have cost €2.80m.")
-    assert "Your worst year (2023, €2.00m) would have been €0.50m lower" in s
+    assert "Your worst year (2023, €2.00m) would have been €500k lower" in s
     assert s.endswith("In total you did better than: Fix 100% in October.")  # 3.0 < 4.2; a tie (3.0) is not "better"
     nl = au.sentence(r, "nl")
-    assert "€ 3,00 mln" in nl and "€ 0,50 mln lager" in nl and nl.endswith(".")
+    assert "€ 3,00 mln" in nl and "€ 500.000 lager" in nl and nl.endswith(".")
     t2 = t.copy()
     t2[au.OURS] = [0.5e6, 0.9e6]  # the company beat every strategy in every year
     s2 = au.sentence(au.AuditResult(t2, pd.DataFrame(), pd.DataFrame()))
-    assert "€0.60m higher with the 2-year ladder" in s2 and "HedgeWise ladder" in s2
+    assert "€600k higher with the 2-year ladder" in s2 and "HedgeWise ladder" in s2
 
 
 @pytest.mark.parametrize(

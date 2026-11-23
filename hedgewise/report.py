@@ -318,7 +318,7 @@ def _audit_page(r: object, lang: str, T: dict, ss: dict, W: float) -> list:
     rows = [[str(y)] + [_num(v / 1e3, lang) for v in t.loc[y]] for y in t.index]
     rows.append([T["audit_total"]] + [_num(v / 1e3, lang) for v in t.sum()])
     rows.append([T["audit_worst"]] + [_num(v / 1e3, lang) for v in t.max()])
-    cell = ParagraphStyle("cell", fontName=FONT, fontSize=7, leading=8.5, textColor=INK)
+    cell = ParagraphStyle("cell", fontName=FONT, fontSize=6.5, leading=8, textColor=INK)
     data = [[Paragraph(_esc(h), cell) for h in hdr]] + rows
     cw = [W * 0.1] + [W * 0.9 / len(t.columns)] * len(t.columns)
     tb = Table(data, colWidths=cw)
