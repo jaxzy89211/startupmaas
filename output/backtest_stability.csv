@@ -1,3 +1,10 @@
+# hedgewise_version: "0.5.0"
+# config_file: "config.yaml"
+# config_hash: "2d2e0be3ca51"
+# data_hash: "8181ab654204"
+# data_files: {"gas_ttf.csv": "eb651645abc9", "power_nl_daily.csv": "d15cd68d0cd3"}
+# data_from: "2019-01-02"
+# data_to: "2026-11-23"
 ,total,worst_year,stdev,max_jump
 All variable,6403411.643260988,2670490.478224855,784968.9194289221,1584140.0054144629
 Fix 100% in Oct,7984856.917700199,4312460.230413242,1568935.056669105,2853026.8895322434

@@ -1,4 +1,4 @@
-# HedgeWise model (v0.4)
+# HedgeWise model (v0.5)
 
 Energy price-risk model for mid-sized Dutch companies: **consumption in → worst-case bill and hedge recommendation out.**
 
@@ -12,7 +12,8 @@ python hedgewise_model.py          # today's view for next calendar year
 python backtest.py                 # strict 2021-2025 backtest + pitch chart
 python report.py --lang nl         # one-page PDF risk report for a CFO (EN or NL)
 streamlit run app.py               # live demo dashboard in the browser
-python -m pytest -q                # tests (pip install -r requirements-dev.txt)
+python -m pytest -q --cov          # tests + coverage (pip install -r requirements-dev.txt)
+ruff check . && ruff format --check .   # lint
 ```
 
 To put the dashboard online (private GitHub repo + Streamlit Community Cloud), follow `DEPLOY.md`.
@@ -21,20 +22,47 @@ Every chart and table is written to `output/`. See `RESULTS.md` for the numbers.
 
 ## Files
 
-| File | What it does |
+The code lives in the `hedgewise/` package. The scripts in the repository root are thin wrappers, so every command
+below works as before. When imported (`import backtest`, `import hedgewise_model`), a wrapper *is* the package module.
+
+| Where | What it does |
 |---|---|
-| `download_data.py` | Dutch day-ahead power (Energy-Charts, or ENTSO-E with `--entsoe`) and TTF gas (Yahoo `TTF=F`) from 2019 to today |
-| `hedgewise_model.py` | Model fit, Monte Carlo, strategies, risk metrics, recommendation, charts |
-| `backtest.py` | Strict backtest: each decision re-fits the model on data available on that date only. Writes `pitch_cycle.png` (main pitch chart) and `pitch_2022.png` |
-| `app.py` | Streamlit dashboard for the live demo: bill upload or yearly totals, stress test, PDF download |
-| `company_input.py` | Reads a company's consumption: our template, any CSV/Excel export (columns detected, Dutch formats), or yearly totals + sector profile |
-| `report.py` | One-page A4 PDF risk report in English or Dutch (`make_report(analysis, path, lang)`), DejaVu Sans embedded, with trade-off and stress charts |
-| `forwards.py` | Loads real forward prices from `data/forwards.csv` (if present) to replace the proxy |
-| `tests/` | pytest tests: input parsing, stress test, policy, forwards |
-| `data/company_example.csv` | Template for pilot data (month, gas_m3, power_kwh), one row per month of bills |
+| `config.yaml` | **Every modelling assumption** (premium, look-back, floors, caps, scenario count, seed, solar yield, sector profiles, default company, backtest settings), with a comment on each. Read once and validated by `hedgewise/config.py`; override with `HEDGEWISE_CONFIG=other.yaml` |
+| `hedgewise/__init__.py` | The public, audit-ready API (explicit `__all__`); its docstring shows the pipeline in 7 lines |
+| `hedgewise/data.py` | Loads prices (`load_prices`, investing.com formats, optional CO₂), demo data |
+| `hedgewise/company.py` | `Company`: monthly gas/power profile, rooftop solar |
+| `hedgewise/models.py` | GARCH(1,1)-t, power regression, correlation, `fit()`, `describe()` |
+| `hedgewise/simulate.py` | Monte Carlo price paths |
+| `hedgewise/strategies.py` | `analyse()` (strategies, risk, optimiser, budget mode), policy, stress test, advice text |
+| `hedgewise/charts.py` | All model charts |
+| `hedgewise/report.py` | One-page A4 PDF (English or Dutch), DejaVu Sans embedded |
+| `hedgewise/backtest.py` | Strict backtest (each decision re-fits on data up to that date only) |
+| `hedgewise/company_input.py` | Real bills: any CSV/Excel export, Dutch formats, yearly totals + sector |
+| `hedgewise/forwards.py` | Real forward prices from `data/forwards.csv` (if present) |
+| `hedgewise/provenance.py` | Writes config hash, data hashes and data date range into every output |
+| `hedgewise/settings.py`, `config.py`, `naming.py`, `cli.py`, `_types.py` | Settings from config, config loader, output names, model CLI, type aliases |
+| `hedgewise_model.py`, `backtest.py`, `report.py`, `company_input.py`, `forwards.py` | Thin wrappers (commands unchanged) |
+| `app.py` | Streamlit dashboard for the live demo |
+| `download_data.py` | Refresh power (Energy-Charts / ENTSO-E) and gas (Yahoo `TTF=F`) prices |
+| `tests/` | 97 tests incl. `test_golden.py` (backtest totals must match `golden_backtest.json` to within €1) and a dashboard smoke test |
+| `requirements.txt` / `requirements-dev.txt` / `requirements.lock` | Minimum versions / + test tools / exact versions that produced the committed results |
+| `.github/workflows/ci.yml` | Ruff (lint + format) and pytest on Python 3.11 and 3.12, on every push |
+| `data/company_example.csv` | Template for pilot data (month, gas_m3, power_kwh) |
 | `data/forwards_example.csv` | **Fake** forward prices, only for the tests. Never copy it to `data/forwards.csv` |
-| `DEPLOY.md` | Click-by-click: private GitHub repo + Streamlit Community Cloud |
-| `.streamlit/config.toml` | Dashboard theme |
+| `DEPLOY.md`, `.streamlit/config.toml` | Deployment steps, dashboard theme |
+
+## Reproducibility and quality
+
+* **Provenance:** every output records the config hash, a hash of each price file, the data date range and the
+  version. CSVs get `#` lines on top (read them with `pd.read_csv(path, comment="#")`), JSONs a `_provenance` key,
+  PNGs a `Description` text chunk, and PDFs a footer line plus document metadata. There are no timestamps, so the
+  same code, config and data give identical files.
+* **Exact environment:** `pip install -r requirements.lock` (Python 3.14.3, macOS arm64). CI tests the looser
+  `requirements.txt` on Python 3.11 and 3.12.
+* **Checks:** `ruff check . && ruff format --check .` and `python -m pytest --cov`. Coverage of the non-plotting
+  code is 97%, with a floor of 80% (plotting is checked by looking at the charts).
+* **Golden numbers:** if an intended change moves a backtest total, regenerate `tests/golden_backtest.json`
+  deliberately and say why in the commit message.
 
 ## Useful commands
 
@@ -63,10 +91,10 @@ python backtest.py --company data/pilot_x.csv
 2. **Power:** `log P = a + b·log gas [+ c·log CO₂] + annual seasonality + weekend effect + AR(1) residual`, with Student-t innovations. Fitted on the last 2 years. Power inherits gas crises and keeps its own spikes.
 3. **Correlation:** the shocks are correlated using standardized residuals. Fat tails are joint.
 4. **Monte Carlo:** 10,000 daily paths from the as-of date to the end of the delivery year.
-5. **Anchoring (new in v0.3):** the simulated paths are scaled so the expected delivery price equals today's fixed price minus the premium (ramping from 1 today to the full scale at delivery). Fixed prices quoted on later tranche dates are martingales around today's fixed price. *The market sets the level, the model sets the risk*, so hedging costs exactly the premium in expectation. Switch off with `ANCHOR_TO_FORWARD = False`.
+5. **Anchoring (new in v0.3):** the simulated paths are scaled so the expected delivery price equals today's fixed price minus the premium (ramping from 1 today to the full scale at delivery). Fixed prices quoted on later tranche dates are martingales around today's fixed price. *The market sets the level, the model sets the risk*, so hedging costs exactly the premium in expectation. Switch off with `fixed_price.anchor_to_forward: false` in `config.yaml`.
 6. **Strategies:** all variable; fix 60% now; fix 100% now; fix in monthly tranches (up to 6); and HedgeWise.
-7. **HedgeWise optimizer:** grid search over one hedge ratio for gas and power (0–100% in 5% steps; `SAME_RATIO = False` for separate ratios), executed in tranches. It has two goals:
-   * `--risk-aversion γ`: minimize `E[cost] + (γ/2)·Var[cost] / E[all-variable bill]`. Variance is quadratic in the hedge ratio, so the answer is interior (roughly `1 − premium / (γ·CV²)`). The v0.2 objective `(1-λ)·E + λ·ES95` is linear in the ratio (ES is positively homogeneous) and could only answer 0% or 100%; it's still available as `OBJECTIVE = "mean_es"`.
+7. **HedgeWise optimizer:** grid search over one hedge ratio for gas and power (0–100% in 5% steps; `optimiser.same_ratio: false` in `config.yaml` for separate ratios), executed in tranches. It has two goals:
+   * `--risk-aversion γ`: minimize `E[cost] + (γ/2)·Var[cost] / E[all-variable bill]`. Variance is quadratic in the hedge ratio, so the answer is interior (roughly `1 − premium / (γ·CV²)`). The v0.2 objective `(1-λ)·E + λ·ES95` is linear in the ratio (ES is positively homogeneous) and could only answer 0% or 100%; it's still available as `optimiser.objective: mean_es` in `config.yaml`.
    * `--budget`: the smallest hedge that keeps the 95% VaR within budget. `auto` means the last 12 months' bill plus 20%.
 8. **Efficient frontier:** expected bill against bad-case bill for every share fixed, with the recommendation marked. This is the main chart for a CFO.
 9. **Risk metrics:** expected cost, median, 95% VaR, 95% Expected Shortfall (the average of the worst 5%), and the worst simulated year.
@@ -75,7 +103,7 @@ python backtest.py --company data/pilot_x.csv
 12. **Real forwards (v0.4, `forwards.py`):** if `data/forwards.csv` exists (columns date, product such as `TTF Cal-27` / `NL Base Cal-27`, and price), the latest quote on or before the decision date replaces the proxy as the fixed price and as the anchor (expected spot = forward / 1.05). Every output says which source was used. `data/forwards.csv` is git-ignored because licensed data must not be pushed.
 13. **HedgeWise ladder (backtest only):** 40% in H2 of Y-2, then a top-up to the model's target in H2 of Y-1, capped at the previous season's target + 10 points. ⚠️ Designed after seeing the 2021–2025 results, so its backtest is not independent evidence.
 
-**Consumption input (v0.4, `company_input.py`):** units m³ / kWh / MWh / GJ for gas (1 GJ = 0.2778 MWh) and kWh / MWh for power. It handles Dutch numbers (`1.234,5`) and month names (`januari 2025`, `mrt-25`), and title rows above the table. With several years it averages per calendar month. If 1–3 months are missing it fills them from the sector profile with a warning; with more missing it raises an error. The sector profiles (food processing, metal, greenhouse horticulture, offices) are **assumptions** in `SECTOR_PROFILES`.
+**Consumption input (v0.4, `company_input.py`):** units m³ / kWh / MWh / GJ for gas (1 GJ = 0.2778 MWh) and kWh / MWh for power. It handles Dutch numbers (`1.234,5`) and month names (`januari 2025`, `mrt-25`), and title rows above the table. With several years it averages per calendar month. If 1–3 months are missing it fills them from the sector profile with a warning; with more missing it raises an error. The sector profiles (food processing, metal, greenhouse horticulture, offices) are **assumptions** in `config.yaml` (`sector_profiles`).
 
 **Company profile (assumption, replace with interview or pilot data):** a hypothetical Limburg food processor using 1.2 million m³ of gas a year (≈11.7 GWh, winter-heavy) and 5 GWh of power (flat, small summer bump). Check against CBS StatLine: search "energieverbruik industrie bedrijfstak" for the food industry (SBI 10). Or better, use your first interview.
 

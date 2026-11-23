@@ -1428,5 +1428,17 @@
     "ladder_final_target": 0.65,
     "ladder_fixed_share": 0.6666666666666667,
     "ladder_prev_target_used": 0.65
+  },
+  "_provenance": {
+    "hedgewise_version": "0.5.0",
+    "config_file": "config.yaml",
+    "config_hash": "2d2e0be3ca51",
+    "data_hash": "8181ab654204",
+    "data_files": {
+      "gas_ttf.csv": "eb651645abc9",
+      "power_nl_daily.csv": "d15cd68d0cd3"
+    },
+    "data_from": "2019-01-02",
+    "data_to": "2026-11-23"
   }
 }
