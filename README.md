@@ -95,7 +95,7 @@ below works as before. When imported (`import backtest`, `import hedgewise_model
 | `hedgewise_model.py`, `backtest.py`, `report.py`, `company_input.py`, `forwards.py` | Thin wrappers (commands unchanged) |
 | `app.py` | Streamlit dashboard for the live demo |
 | `download_data.py` | Refresh power (Energy-Charts / ENTSO-E) and gas (Yahoo `TTF=F`) prices |
-| `tests/` | 148 tests incl. `test_golden.py` (backtest totals must match `golden_backtest.json` to within €1) and a dashboard smoke test |
+| `tests/` | 174 tests incl. `test_golden.py` (backtest totals must match `golden_backtest.json` to within €1) and a dashboard smoke test |
 | `requirements.txt` / `requirements-dev.txt` / `requirements.lock` | Minimum versions / + test tools / exact versions that produced the committed results |
 | `.github/workflows/ci.yml` | Ruff (lint + format) and pytest on Python 3.11 and 3.12, on every push |
 | `data/company_example.csv` | Template for pilot data (month, gas_m3, power_kwh) |
