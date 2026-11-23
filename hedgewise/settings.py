@@ -6,6 +6,9 @@ from the config file.
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+
 import numpy as np
 
 from .config import ROOT, load_config
@@ -13,7 +16,9 @@ from .config import ROOT, load_config
 _C = load_config()
 
 DATA = ROOT / "data"
-OUT = ROOT / "output"
+OUT = (
+    Path(os.environ["HEDGEWISE_OUT"]) if os.environ.get("HEDGEWISE_OUT") else ROOT / "output"
+)  # env: run_with_forwards
 
 # fixed conventions (not assumptions)
 MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]

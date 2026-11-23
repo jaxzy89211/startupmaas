@@ -26,3 +26,6 @@ clients/*.yaml
 
 # git bundles (full copies of the history) never go into the repository
 *.bundle
+
+# outputs of run_with_forwards.py contain licensed forward prices
+output/forwards_run/

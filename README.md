@@ -54,6 +54,8 @@ python report.py --green-solar-kwp 1000 --green-battery-kwh 1000 --green-ppa-sha
 python validation.py               # out-of-sample model validation (~1-2 min) -> METHODOLOGY.md
 python extract.py bill.pdf [--ai]  # read PDF invoices/contracts (--ai = consent to send them to the AI service)
 python monitor.py --no-download   # monthly update drafts for every client in clients/ (see MONITORING.md)
+python forwards_import.py export.xlsx   # real forward prices (Refinitiv/Bloomberg/EEX/ICE export) -> data/forwards.csv
+python run_with_forwards.py        # rerun everything with them; "proxy vs real forwards" section in RESULTS.md
 python market.py                  # market size from CBS open data -> MARKET.md numbers (--offline: data/cbs/ snapshot)
 python robustness.py --histories 200   # synthetic 8-year futures (~25 min on 4 cores; resumable, see below)
 python download_data.py --extended && python backtest.py --market DE-LU --years 2020 2021 2022 2023 2024 2025
@@ -93,6 +95,7 @@ below works as before. When imported (`import backtest`, `import hedgewise_model
 | `TEAM_GUIDE.md`, `tools/screenshots.py` | Guide for the (non-coding) team: interviews, what the numbers mean, allowed claims, 15 hard questions; screenshots made with headless Chrome |
 | `hedgewise/extract.py` | Reads PDF invoices/statements/contracts (NL/EN) into monthly volumes, prices and dates with page + quote + confidence; engine (a) pdfplumber + rules (local), engine (b) Anthropic API with a strict JSON schema only with `ANTHROPIC_API_KEY` and the user's consent; plausibility flags; a person confirms in the app before anything is used. AI only reads, never advises |
 | `hedgewise/monitor.py`, `clients/`, `MONITORING.md` | Monthly update per client (DRAFTS, nothing is sent): refresh prices, refit, bad case now and with the full plan, what to buy this month, flags (bad case ±15%, prices ±20%, overdue tranche), one-page PDF (EN/NL), email draft, overview; app tab "Plan tracker" |
+| `hedgewise/forwards_import.py`, `hedgewise/forwards_run.py`, `FORWARD_SOURCES.md` | Importers for real forward-price exports (Refinitiv, Bloomberg, EEX DataSource, ICE Endex; calendar-year baseload TTF / Dutch power only, report with gaps) and the one-command rerun with them (`run_with_forwards.py`: separate output folder, side-by-side section in RESULTS.md, flags pitch numbers that move >5%; refuses FAKE data in RESULTS.md). Which free sources were checked and why none works |
 | `hedgewise/robustness.py` | Strategies on synthetic 8-year futures (model, block bootstrap, 3 named stress paths). Runs in chunks of 20 histories, each saved to `output/robustness_chunks/` as soon as it finishes (git-ignored); rerunning the same command resumes, and at most 4 worker processes are used |
 | `hedgewise/provenance.py` | Writes config hash, data hashes and data date range into every output |
 | `hedgewise/settings.py`, `config.py`, `naming.py`, `cli.py`, `_types.py` | Settings from config, config loader, output names, model CLI, type aliases |
