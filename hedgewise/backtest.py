@@ -380,8 +380,9 @@ def plot_cycle(results: pd.DataFrame, typical_key: str, path: PathOrBuffer) -> N
         ax.plot(yrs, v, "-", marker=mk, color=col, lw=2, ms=8, label=lbl)
     ax.set_xticks(yrs)
     ax.set_ylabel("Realised gas + power bill (EUR m)")
-    ax.set_title("Annual bill, 2021-2025 (every decision uses only data available at the time)", fontsize=11)
-    ax.legend(frameon=False, fontsize=9, loc="upper right")
+    span = f"{yrs[0]}-{yrs[-1]}"
+    ax.set_title(f"Annual bill, {span} (every decision uses only data available at the time)", fontsize=11)
+    ax.legend(frameon=False, fontsize=9, loc="best")
     ax.grid(alpha=0.25)
     ax.spines[["top", "right"]].set_visible(False)
     ax.set_ylim(0, results[[k for k, *_ in series]].values.max() / 1e6 * 1.1)
@@ -389,7 +390,7 @@ def plot_cycle(results: pd.DataFrame, typical_key: str, path: PathOrBuffer) -> N
     metrics = [
         ("Worst year", results.max()),
         ("Biggest jump\nyear-on-year", results.diff().max()),
-        ("Total 5 years\n/ 5 (avg year)", results.sum() / len(results)),
+        (f"Total {len(results)} years\n/ {len(results)} (avg year)", results.sum() / len(results)),
     ]
     w = 0.8 / len(series)
     x = np.arange(len(metrics))

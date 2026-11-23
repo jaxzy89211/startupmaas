@@ -162,6 +162,58 @@ available at the time. Outside the 2021–22 crisis, our 90% bands held 90–92%
 crisis, no statistical model could see it coming: ours held 36–40%. That's why HedgeWise always shows a '2022
 happens again' stress test next to the model."
 
+## Robustness (new in v0.7)
+
+### Other markets: Dutch, German and Belgian power, 2020–2025
+
+`python download_data.py --extended` downloads day-ahead power for NL, DE-LU (DE-AT-LU before 1 Oct 2018) and BE from
+January 2015 (Energy-Charts), and TTF gas as far back as the free Yahoo series goes (23 Oct 2017; gas is the binding
+limit). With gas from late 2017 the first delivery year that every strategy can trade is **2020** (the 2-year ladder
+buys for 2020 in H2 2018). `python backtest.py --market DE-LU --years 2020 2021 2022 2023 2024 2025` (and `BE`, and
+`NL --extended`) reruns the same backtest per country, with the same company, the same TTF gas, the same rules and the
+same fixed-price proxy. Outputs: `output/backtest_*_<market>_extended.*`.
+
+| €k, 2020–2025 (6 years) | NL total | NL worst year | DE-LU total | DE-LU worst year | BE total | BE worst year |
+|---|---|---|---|---|---|---|
+| All variable | 6,685 | 2,670 | 6,631 | 2,640 | 6,652 | 2,684 |
+| Fix 100% in Oct | 8,330 | 4,312 | 8,175 | 4,274 | 8,217 | 4,320 |
+| Fix 60% at once (Jul) | 5,869 | 1,852 | 5,779 | 1,839 | 5,857 | 1,894 |
+| Tranches 6× (60%) | 7,040 | 2,472 | 6,944 | 2,451 | 6,999 | 2,490 |
+| Layered 2 years (40+40%) | 7,041 | 2,107 | 6,907 | 2,073 | 7,014 | 2,114 |
+| HedgeWise policy γ=0.5 | 7,461 | 2,838 | 7,387 | 2,812 | 7,410 | 2,862 |
+| HedgeWise ladder (in-sample rule) | 7,121 | 1,879 | 7,013 | 1,864 | 7,109 | 1,875 |
+
+| Biggest year-on-year jump, €k | NL | DE-LU | BE |
+|---|---|---|---|
+| All variable | 1,584 | 1,584 | 1,592 |
+| Fix 100% in Oct | 2,853 | 2,879 | 2,881 |
+| Tranches 6× (60%) | 1,243 | 1,219 | 1,241 |
+| Layered 2 years (40+40%) | 929 | 927 | 939 |
+| HedgeWise policy γ=0.5 | 1,170 | 1,099 | 1,191 |
+| HedgeWise ladder | 846 | 833 | 854 |
+
+**What this does and doesn't show:**
+* **The ranking is the same in all three countries.** Layered 2 years and 60% tranches cost 4–5.5% more than staying
+  variable over 2020–2025 and cut the worst year by 7% (tranches) to 21% (layered) and the biggest jump by 21–23%
+  (tranches) to 41% (layered). Fixing 100% in October is the worst on every measure in every country (+23–25% total,
+  worst year 1.6× all-variable). **The HedgeWise policy loses here:** it costs 11–12% more than all-variable, and its
+  worst year is 6–7% *worse* than staying variable and 35% worse than the layered rule (it locked in crisis prices for
+  2023, in every country).
+* **This is not three independent tests.** NL, DE-LU and BE day-ahead prices are coupled (2022 averages €242 / €235 /
+  €245 per MWh) and the gas leg (≈ 55% of the all-variable bill) is the same TTF series everywhere. The countries
+  differ by less than 2.5% on any total. It shows the result doesn't hinge on a Dutch power quirk; it is still one
+  European price history.
+* **Adding 2020 (a calm, falling year) doesn't change the order.** In 2020 all hedges lost a little (all variable
+  €281k, layered €439k, the most expensive that year).
+* **"Fix 60% at once in July" is again cheapest (−12% vs variable) and that is again luck of the month** (see "Two
+  things the jury will ask about"). Not pitched.
+* **The HedgeWise ladder** has the lowest worst year and jump in all three countries, but it was designed after seeing
+  2021–2025 NL results, and these countries share that history. Not independent evidence.
+* **Sensitivity to history length:** with fits that start in Oct 2017 instead of Jan 2019, the model-driven columns
+  move slightly for the same 2021–2025 years (HedgeWise policy NL total 2021–25: €7.16m vs €7.19m in the main
+  backtest). The rule-based columns don't use the model and are identical to within €2k.
+* Each extended run also writes its own `pitch_cycle_<market>_extended.png`; the main `pitch_cycle.png` is unchanged.
+
 ## Calibration
 
 The realised 2021 and 2022 bills were above the model's 95th percentile (2 of 5 years outside the 5–95% range; a calibrated model would miss ~1 in 10). After the crisis the bands are very wide (2023 ES95 €7.7m against €0.99m realised). GARCH reacts to volatility after it has happened, so it is too calm before a crisis and too nervous after one. Next step: a stress scenario on top (for example "2022 repeats") and/or a regime-switching component.

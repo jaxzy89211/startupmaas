@@ -1,0 +1,102 @@
+Market BE: day-ahead power from data/extended/, TTF gas; history 2017-10-23 .. 2026-11-23
+Company: Limburg food processor (hypothetical) | gas 1,200,000 m3/yr (11,723 MWh), power 5,000 MWh/yr
+
+  2020: decision 2019-06-30 fitted+simulated in 1s | fixed price gas 11.4, power 32.0
+  2020: decision 2019-07-31 fitted+simulated in 0s | fixed price gas 11.7, power 40.4
+  2020: decision 2019-08-31 fitted+simulated in 0s | fixed price gas 11.9, power 33.1
+  2020: decision 2019-09-30 fitted+simulated in 0s | fixed price gas 13.7, power 32.0
+  2020: decision 2019-10-31 fitted+simulated in 0s | fixed price gas 16.4, power 35.8
+  2020: decision 2019-11-30 fitted+simulated in 0s | fixed price gas 16.7, power 43.4
+  2021: decision 2020-06-30 fitted+simulated in 0s | fixed price gas 5.6, power 27.7
+  2021: decision 2020-07-31 fitted+simulated in 0s | fixed price gas 5.6, power 30.5
+  2021: decision 2020-08-31 fitted+simulated in 0s | fixed price gas 8.7, power 34.4
+  2021: decision 2020-09-30 fitted+simulated in 0s | fixed price gas 12.0, power 40.8
+  2021: decision 2020-10-31 fitted+simulated in 0s | fixed price gas 14.9, power 37.0
+  2021: decision 2020-11-30 fitted+simulated in 0s | fixed price gas 14.6, power 39.6
+  2022: decision 2021-06-30 fitted+simulated in 1s | fixed price gas 30.5, power 77.1
+  2022: decision 2021-07-31 fitted+simulated in 0s | fixed price gas 37.9, power 77.1
+  2022: decision 2021-08-31 fitted+simulated in 0s | fixed price gas 46.9, power 78.6
+  2022: decision 2021-09-30 fitted+simulated in 0s | fixed price gas 68.1, power 128.3
+  2022: decision 2021-10-31 fitted+simulated in 0s | fixed price gas 93.7, power 156.0
+  2022: decision 2021-11-30 fitted+simulated in 0s | fixed price gas 86.3, power 193.0
+  2023: decision 2022-06-30 fitted+simulated in 1s | fixed price gas 112.1, power 236.1
+  2023: decision 2022-07-31 fitted+simulated in 1s | fixed price gas 179.0, power 344.5
+  2023: decision 2022-08-31 fitted+simulated in 1s | fixed price gas 251.9, power 477.7
+  2023: decision 2022-09-30 fitted+simulated in 1s | fixed price gas 211.3, power 368.8
+  2023: decision 2022-10-31 fitted+simulated in 1s | fixed price gas 142.9, power 170.9
+  2023: decision 2022-11-30 fitted+simulated in 1s | fixed price gas 123.9, power 193.1
+  2024: decision 2023-06-30 fitted+simulated in 1s | fixed price gas 33.7, power 94.1
+  2024: decision 2023-07-31 fitted+simulated in 1s | fixed price gas 30.8, power 80.8
+  2024: decision 2023-08-31 fitted+simulated in 1s | fixed price gas 36.7, power 98.8
+  2024: decision 2023-09-30 fitted+simulated in 1s | fixed price gas 38.9, power 102.9
+  2024: decision 2023-10-31 fitted+simulated in 1s | fixed price gas 49.8, power 98.5
+  2024: decision 2023-11-30 fitted+simulated in 1s | fixed price gas 48.3, power 107.2
+  2025: decision 2024-06-30 fitted+simulated in 1s | fixed price gas 36.1, power 60.5
+  2025: decision 2024-07-31 fitted+simulated in 1s | fixed price gas 34.1, power 57.1
+  2025: decision 2024-08-31 fitted+simulated in 1s | fixed price gas 40.4, power 71.9
+  2025: decision 2024-09-30 fitted+simulated in 1s | fixed price gas 38.2, power 74.9
+  2025: decision 2024-10-31 fitted+simulated in 1s | fixed price gas 42.6, power 86.8
+  2025: decision 2024-11-30 fitted+simulated in 1s | fixed price gas 46.8, power 116.4
+Provenance: config b360148627fd · data ad03174fe9d0 (2017-10-23..2026-11-23) · v0.5.0
+
+Fixed prices: 0 from real forwards (no data/forwards.csv), 144 from the proxy (30-day spot + 5%).
+
+Realised annual bill, EUR k
+               All variable  Fix 100% in Oct  Fix 60% at once (Jul)  Tranches 6x (100%)  Tranches 6x (60%)  Layered 2 years (40+40%)  HedgeWise policy (gamma 0.5)  HedgeWise ladder (40% + capped top-up)  HedgeWise (risk aversion 0.3)  HedgeWise (risk aversion 0.5)  HedgeWise (risk aversion 0.8)
+delivery_year                                                                                                                                                                                                                                                                                          
+2020                    279              320                    288                 340                316                       433                           300                                     413                            289                            299                            307
+2021                   1092              345                    559                 295                614                       473                           702                                     736                            866                            695                            602
+2022                   2684             1439                   1520                1302               1855                      1176                          1893                                    1590                           2276                           1893                           1661
+2023                    994             4320                   1894                3488               2490                      2114                          2862                                    1616                           2351                           2862                           3139
+2024                    758              970                    823                 951                874                      1927                           830                                    1875                            799                            830                            861
+2025                    846              822                    773                 855                851                       891                           823                                     880                            817                            823                            825
+TOTAL                  6652             8217                   5857                7231               6999                      7014                          7410                                    7109                           7399                           7401                           7396
+WORST YEAR             2684             4320                   1894                3488               2490                      2114                          2862                                    1875                           2351                           2862                           3139
+STDEV                   822             1505                    608                1182                829                       717                           956                                     586                            863                            957                           1037
+MAX JUMP               1592             2881                    960                2186               1241                       939                          1191                                     854                           1411                           1198                           1478
+
+Realised average prices (EUR/MWh):
+  2020: gas 10.2, power 31.9
+  2021: gas 48.9, power 103.8
+  2022: gas 124.1, power 245.9
+  2023: gas 43.3, power 97.1
+  2024: gas 34.7, power 70.2
+  2025: gas 37.0, power 82.3
+
+HedgeWise policy (gamma 0.5, cap +20%/month): optimiser -> capped target -> bought, per decision date
+  2020: 0%->0% buy 0.0% | 20%->20% buy 4.0% | 65%->40%* buy 9.0% | 85%->60%* buy 15.7% | 50%->50% buy 10.7% | 0%->0% buy 0.0%
+  2021: 65%->65% buy 10.8% | 55%->55% buy 8.8% | 80%->75%* buy 13.8% | 75%->75% buy 13.8% | 15%->15% buy 0.0% | 10%->10% buy 0.0%
+  2022: 50%->50% buy 8.3% | 55%->55% buy 9.3% | 55%->55% buy 9.3% | 70%->70% buy 14.3% | 70%->70% buy 14.3% | 55%->55% buy 0.0%
+  2023: 85%->85% buy 14.2% | 80%->80% buy 13.2% | 85%->85% buy 14.4% | 80%->80% buy 12.8% | 75%->75% buy 10.2% | 70%->70% buy 5.2%
+  2024: 90%->90% buy 15.0% | 85%->85% buy 14.0% | 80%->80% buy 12.8% | 70%->70% buy 9.4% | 60%->60% buy 4.4% | 50%->50% buy 0.0%
+  2025: 80%->80% buy 13.3% | 75%->75% buy 12.3% | 70%->70% buy 11.1% | 65%->65% buy 9.4% | 55%->55% buy 4.4% | 55%->55% buy 4.4%
+  (* = capped)
+
+HedgeWise ladder: 40% in H2 of Y-2, then top-up to the model's target (capped at previous season's target + 10%) in H2 of Y-1. DESIGNED AFTER SEEING THESE RESULTS.
+  2020: prev season target none -> 40% base, cap 50% | 0%->40% buy 0.0% | 20%->40% buy 0.0% | 65%->50% buy 2.5% | 85%->50% buy 2.5% | 50%->50% buy 2.5% | 0%->40% buy 0.0% | fixed 48%
+  2021: prev season target 40%, cap 50% | 65%->50% buy 1.7% | 55%->50% buy 1.7% | 80%->50% buy 1.7% | 75%->50% buy 1.7% | 15%->40% buy 0.0% | 10%->40% buy 0.0% | fixed 47%
+  2022: prev season target 40%, cap 50% | 50%->50% buy 1.7% | 55%->50% buy 1.7% | 55%->50% buy 1.7% | 70%->50% buy 1.7% | 70%->50% buy 1.7% | 55%->50% buy 1.7% | fixed 50%
+  2023: prev season target 50%, cap 60% | 85%->60% buy 3.3% | 80%->60% buy 3.3% | 85%->60% buy 3.3% | 80%->60% buy 3.3% | 75%->60% buy 3.3% | 70%->60% buy 3.3% | fixed 60%
+  2024: prev season target 60%, cap 70% | 90%->70% buy 5.0% | 85%->70% buy 5.0% | 80%->70% buy 5.0% | 70%->70% buy 5.0% | 60%->60% buy 0.0% | 50%->50% buy 0.0% | fixed 60%
+  2025: prev season target 50%, cap 60% | 80%->60% buy 3.3% | 75%->60% buy 3.3% | 70%->60% buy 3.3% | 65%->60% buy 3.3% | 55%->55% buy 0.8% | 55%->55% buy 0.8% | fixed 55%
+
+Fix 100% once - result depends on the month you pick (EUR k):
+         Jul     Aug     Sep     Oct     Nov     Dec
+2020   294.0   339.0   305.0   320.0   371.0   413.0
+2021   204.0   218.0   274.0   345.0   360.0   369.0
+2022   743.0   830.0   942.0  1439.0  1879.0  1977.0
+2023  2495.0  3821.0  5342.0  4320.0  2529.0  2418.0
+2024   866.0   766.0   924.0   970.0  1076.0  1102.0
+2025   725.0   685.0   833.0   822.0   934.0  1131.0
+
+Model forecast of the all-variable bill (as of 30 Jun of the year before) vs realised (EUR k):
+  2020: median 264, 5-95% [159 - 450], ES95 523 | realised 279
+  2021: median 171, 5-95% [76 - 394], ES95 515 | realised 1,092  <-- outside 5-95%
+  2022: median 641, 5-95% [305 - 1,336], ES95 1,691 | realised 2,684  <-- outside 5-95%
+  2023: median 1,997, 5-95% [802 - 5,038], ES95 7,572 | realised 994
+  2024: median 674, 5-95% [229 - 1,844], ES95 2,812 | realised 758
+  2025: median 589, 5-95% [223 - 1,517], ES95 2,112 | realised 846
+  Coverage: 2 of 6 years outside the 5-95% range (a calibrated model: ~10%).
+
+HEADLINE: in 2022 an unhedged Limburg food processor (hypothetical) paid EUR 2.68m; fixing in 6 monthly tranches it would have paid EUR 1.30m (saving EUR 1.38m, 51%). HedgeWise optimiser (risk aversion 0.5): EUR 1.89m.
+Charts: /Users/brunokardas/hedgewise/output/pitch_2022_BE_extended.png, pitch_cycle_BE_extended.png, backtest_all_years_BE_extended.png, ...
