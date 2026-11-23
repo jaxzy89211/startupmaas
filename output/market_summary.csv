@@ -1,6 +1,6 @@
 # hedgewise_version: "0.7.0"
 # config_file: "config.yaml"
-# config_hash: "9cbfbda9d6dc"
+# config_hash: "bd4a49b38e43"
 region,all_10_250_in_these_sectors,target_companies,energy_use_gwh,energy_spend_eur,revenue_if_all_subscribe_eur,revenue_1%_adoption_eur,revenue_5%_adoption_eur,revenue_10%_adoption_eur
 Netherlands,4435.0,3620.0,49447.4260585042,2431027809.4300537,18277113.908775628,182771.13908775628,913855.6954387814,1827711.3908775628
 Limburg,297.36224191320923,245.15529603560796,3687.061034283579,181481273.9293011,1288525.0432493608,12885.250432493607,64426.25216246804,128852.50432493608

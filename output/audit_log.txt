@@ -34,6 +34,6 @@ Your fixed prices vs the market proxy (30-day spot + 5%) on the day you fixed (E
  2025       gas    0.6  39.5 EUR/MWh           39.5 2024-10-01                   38.2
  2025     power    0.6    8.8 ct/kWh           88.0 2024-10-01                   85.1
 
-You paid €6.16m over 2021-2025; the 2-year ladder would have cost €6.60m. Your worst year (2023, €2.40m) would have been €0.29m lower with the 2-year ladder. In total you did better than: All variable, Fix 100% in October, 60% in monthly tranches, 2-year ladder (40%+40%), HedgeWise ladder.
+You paid €6.16m over 2021-2025; the 2-year ladder would have cost €6.60m. Your worst year (2023, €2.40m) would have been €290k lower with the 2-year ladder. In total you did better than: All variable, Fix 100% in October, 60% in monthly tranches, 2-year ladder (40%+40%), HedgeWise ladder.
 Wrote /Users/brunokardas/hedgewise/output/audit_table.csv, audit_detail.csv, audit_en.png
-Provenance: config 9cbfbda9d6dc · data 8181ab654204 (2019-01-02..2026-11-23) · v0.7.0
+Provenance: config bd4a49b38e43 · data 8181ab654204 (2019-01-02..2026-11-23) · v0.7.0

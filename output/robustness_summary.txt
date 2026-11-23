@@ -30,4 +30,4 @@ bootstrap           HedgeWise policy (gamma 0.5)  999        170624       7108  
 bootstrap HedgeWise ladder (40% + capped top-up)  999        165858       7626  184900008              50793            1714       115487264      68216025                74%
 bootstrap          HedgeWise (risk aversion 0.5)  999        169744       7023  130406866              60667            2159        91043106      83024058                50%
 Histories that could not be run (left out of the summary): {'bootstrap': 1}
-Provenance: config 88320de3feda · data 8181ab654204 (2019-01-02..2026-11-23) · v0.7.0
+Provenance: config bd4a49b38e43 · data 8181ab654204 (2019-01-02..2026-11-23) · v0.7.0

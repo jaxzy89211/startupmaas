@@ -1644,9 +1644,9 @@
     "ladder_prev_target_used": 0.5
   },
   "_provenance": {
-    "hedgewise_version": "0.5.0",
+    "hedgewise_version": "0.7.0",
     "config_file": "config.yaml",
-    "config_hash": "b360148627fd",
+    "config_hash": "bd4a49b38e43",
     "data_hash": "501a7fcf5ca1",
     "data_files": {
       "gas_ttf.csv": "b554114e53cb",

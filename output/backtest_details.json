@@ -1432,7 +1432,7 @@
   "_provenance": {
     "hedgewise_version": "0.7.0",
     "config_file": "config.yaml",
-    "config_hash": "9cbfbda9d6dc",
+    "config_hash": "bd4a49b38e43",
     "data_hash": "8181ab654204",
     "data_files": {
       "gas_ttf.csv": "eb651645abc9",

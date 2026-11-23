@@ -22,6 +22,6 @@ Stress scenarios (historical, NOT forecasts), EUR k:
     All variable 2,670 | HedgeWise 1,708 | Fix 60% now 1,516 | Fix 100% now 746
   A shock as big as 2021→2022, from today: implied average price gas 80, power 183 EUR/MWh, multiplier gas x2.81, power x2.35
     All variable 1,861 | HedgeWise 1,304 | Fix 60% now 1,192 | Fix 100% now 746
-Provenance: config 866f2977de7a · data 8181ab654204 (2019-01-02..2026-11-23) · v0.7.0
+Provenance: config bd4a49b38e43 · data 8181ab654204 (2019-01-02..2026-11-23) · v0.7.0
 
 Charts and tables written to /Users/brunokardas/hedgewise/output/  (analysis_2021-06-30.png, fit_2021-06-30.png)

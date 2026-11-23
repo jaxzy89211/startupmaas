@@ -1,43 +1,43 @@
 Market DE-LU: day-ahead power from data/extended/, TTF gas; history 2017-10-23 .. 2026-11-24
 Company: Limburg food processor (hypothetical) | gas 1,200,000 m3/yr (11,723 MWh), power 5,000 MWh/yr
 
-  2020: decision 2019-06-30 fitted+simulated in 1s | fixed price gas 11.4, power 32.1
-  2020: decision 2019-07-31 fitted+simulated in 1s | fixed price gas 11.7, power 36.9
+  2020: decision 2019-06-30 fitted+simulated in 0s | fixed price gas 11.4, power 32.1
+  2020: decision 2019-07-31 fitted+simulated in 0s | fixed price gas 11.7, power 36.9
   2020: decision 2019-08-31 fitted+simulated in 0s | fixed price gas 11.9, power 33.0
-  2020: decision 2019-09-30 fitted+simulated in 1s | fixed price gas 13.7, power 32.9
+  2020: decision 2019-09-30 fitted+simulated in 0s | fixed price gas 13.7, power 32.9
   2020: decision 2019-10-31 fitted+simulated in 0s | fixed price gas 16.4, power 35.5
   2020: decision 2019-11-30 fitted+simulated in 0s | fixed price gas 16.7, power 42.0
   2021: decision 2020-06-30 fitted+simulated in 0s | fixed price gas 5.6, power 25.7
-  2021: decision 2020-07-31 fitted+simulated in 1s | fixed price gas 5.6, power 27.5
-  2021: decision 2020-08-31 fitted+simulated in 1s | fixed price gas 8.7, power 31.1
-  2021: decision 2020-09-30 fitted+simulated in 1s | fixed price gas 12.0, power 38.8
+  2021: decision 2020-07-31 fitted+simulated in 0s | fixed price gas 5.6, power 27.5
+  2021: decision 2020-08-31 fitted+simulated in 0s | fixed price gas 8.7, power 31.1
+  2021: decision 2020-09-30 fitted+simulated in 0s | fixed price gas 12.0, power 38.8
   2021: decision 2020-10-31 fitted+simulated in 0s | fixed price gas 14.9, power 32.7
   2021: decision 2020-11-30 fitted+simulated in 0s | fixed price gas 14.6, power 41.4
-  2022: decision 2021-06-30 fitted+simulated in 1s | fixed price gas 30.5, power 71.3
-  2022: decision 2021-07-31 fitted+simulated in 1s | fixed price gas 37.9, power 74.9
+  2022: decision 2021-06-30 fitted+simulated in 0s | fixed price gas 30.5, power 71.3
+  2022: decision 2021-07-31 fitted+simulated in 0s | fixed price gas 37.9, power 74.9
   2022: decision 2021-08-31 fitted+simulated in 0s | fixed price gas 46.9, power 77.1
   2022: decision 2021-09-30 fitted+simulated in 0s | fixed price gas 68.1, power 119.4
   2022: decision 2021-10-31 fitted+simulated in 0s | fixed price gas 93.7, power 136.4
   2022: decision 2021-11-30 fitted+simulated in 0s | fixed price gas 86.3, power 181.9
   2023: decision 2022-06-30 fitted+simulated in 1s | fixed price gas 112.1, power 219.0
   2023: decision 2022-07-31 fitted+simulated in 1s | fixed price gas 179.0, power 315.1
-  2023: decision 2022-08-31 fitted+simulated in 1s | fixed price gas 251.9, power 468.5
-  2023: decision 2022-09-30 fitted+simulated in 1s | fixed price gas 211.3, power 359.4
-  2023: decision 2022-10-31 fitted+simulated in 1s | fixed price gas 142.9, power 165.9
-  2023: decision 2022-11-30 fitted+simulated in 1s | fixed price gas 123.9, power 192.3
-  2024: decision 2023-06-30 fitted+simulated in 1s | fixed price gas 33.7, power 88.6
-  2024: decision 2023-07-31 fitted+simulated in 1s | fixed price gas 30.8, power 75.4
-  2024: decision 2023-08-31 fitted+simulated in 1s | fixed price gas 36.7, power 94.4
-  2024: decision 2023-09-30 fitted+simulated in 1s | fixed price gas 38.9, power 104.5
-  2024: decision 2023-10-31 fitted+simulated in 1s | fixed price gas 49.8, power 97.3
-  2024: decision 2023-11-30 fitted+simulated in 1s | fixed price gas 48.3, power 107.9
-  2025: decision 2024-06-30 fitted+simulated in 1s | fixed price gas 36.1, power 67.5
-  2025: decision 2024-07-31 fitted+simulated in 1s | fixed price gas 34.1, power 64.6
-  2025: decision 2024-08-31 fitted+simulated in 1s | fixed price gas 40.4, power 83.9
-  2025: decision 2024-09-30 fitted+simulated in 1s | fixed price gas 38.2, power 84.2
-  2025: decision 2024-10-31 fitted+simulated in 1s | fixed price gas 42.6, power 96.6
-  2025: decision 2024-11-30 fitted+simulated in 1s | fixed price gas 46.8, power 128.1
-Provenance: config b360148627fd · data b6f420f748e8 (2017-10-23..2026-11-24) · v0.5.0
+  2023: decision 2022-08-31 fitted+simulated in 0s | fixed price gas 251.9, power 468.5
+  2023: decision 2022-09-30 fitted+simulated in 0s | fixed price gas 211.3, power 359.4
+  2023: decision 2022-10-31 fitted+simulated in 0s | fixed price gas 142.9, power 165.9
+  2023: decision 2022-11-30 fitted+simulated in 0s | fixed price gas 123.9, power 192.3
+  2024: decision 2023-06-30 fitted+simulated in 0s | fixed price gas 33.7, power 88.6
+  2024: decision 2023-07-31 fitted+simulated in 0s | fixed price gas 30.8, power 75.4
+  2024: decision 2023-08-31 fitted+simulated in 0s | fixed price gas 36.7, power 94.4
+  2024: decision 2023-09-30 fitted+simulated in 0s | fixed price gas 38.9, power 104.5
+  2024: decision 2023-10-31 fitted+simulated in 0s | fixed price gas 49.8, power 97.3
+  2024: decision 2023-11-30 fitted+simulated in 0s | fixed price gas 48.3, power 107.9
+  2025: decision 2024-06-30 fitted+simulated in 0s | fixed price gas 36.1, power 67.5
+  2025: decision 2024-07-31 fitted+simulated in 0s | fixed price gas 34.1, power 64.6
+  2025: decision 2024-08-31 fitted+simulated in 0s | fixed price gas 40.4, power 83.9
+  2025: decision 2024-09-30 fitted+simulated in 0s | fixed price gas 38.2, power 84.2
+  2025: decision 2024-10-31 fitted+simulated in 0s | fixed price gas 42.6, power 96.6
+  2025: decision 2024-11-30 fitted+simulated in 0s | fixed price gas 46.8, power 128.1
+Provenance: config bd4a49b38e43 · data b6f420f748e8 (2017-10-23..2026-11-24) · v0.7.0
 
 Fixed prices: 0 from real forwards (no data/forwards.csv), 144 from the proxy (30-day spot + 5%).
 

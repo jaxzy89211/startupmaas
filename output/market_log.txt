@@ -42,4 +42,4 @@ revenue_if_all_subscribe_eur  1.827711e+07    1288525.0
 revenue_1%_adoption_eur       1.827710e+05      12885.0
 revenue_5%_adoption_eur       9.138560e+05      64426.0
 revenue_10%_adoption_eur      1.827711e+06     128853.0
-Provenance: config 9cbfbda9d6dc · v0.7.0
+Provenance: config bd4a49b38e43 · v0.7.0

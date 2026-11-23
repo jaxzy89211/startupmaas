@@ -1,6 +1,6 @@
 # hedgewise_version: "0.7.0"
 # config_file: "config.yaml"
-# config_hash: "9cbfbda9d6dc"
+# config_hash: "bd4a49b38e43"
 sector,size_class,companies_nl,limburg_share,companies_limburg,sector_gas_gwh,sector_power_gwh,persons,persons_source,gwh_per_person,avg_gwh_per_company,target,gas_share,avg_spend_eur
 Food and drink (SBI 10-12),10-20,470,0.058070416095107456,27.293095564700504,15416.6679,6888.889440000001,146800.0,jobs (83583NED),0.15194521348773843,2.127232988828338,True,0.6911581569115816,110086.29400217983
 Food and drink (SBI 10-12),20-50,365,0.058070416095107456,21.19570187471422,15416.6679,6888.889440000001,146800.0,jobs (83583NED),0.15194521348773843,4.86224683160763,True,0.6911581569115816,251625.81486212535
