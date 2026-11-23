@@ -29,9 +29,14 @@ the outcomes are.
 For each share fixed h (0–100%, same for gas and power, bought in monthly tranches until delivery):
 `minimise E[bill] + (γ/2)·Var[bill] / E[all-variable bill]`, γ = risk aversion (default 0.5). Variance is quadratic in
 h, so the answer is interior (≈ 1 − premium / (γ·CV²)). A budget mode picks the smallest h that keeps the 95% VaR within
-budget. The **bad case** shown everywhere is the expected shortfall: the average of the worst 5% of scenarios. The
-trade-off chart shows expected bill vs bad case for every h. The **HedgeWise policy** caps the rise of the target at 20
-points per month (5 steps × 20 = 100%, set from the calendar, not the backtest).
+budget. **The recommendation is the HedgeWise ladder** (pre-registered 23 Nov 2026, `PREREGISTRATION.md`): the
+optimiser's share at γ = 0.5 is the *model target*, kept between the 40% base layer (bought in H2 of Y-2) and last
+season's target + 10 points, and bought in monthly tranches in H2 of Y-1. Its 2021–2025 results are in-sample; from
+2027 every new year and market is scored out of sample. The plain optimiser stays available as "model-only" (not
+recommended: procyclical). The **bad case** shown to clients is the higher of the model's expected shortfall (average
+of the worst 5% of scenarios) and the bill in a repeat of the 2021→2022 shock (labelled model / stress), because the
+model's 12-month ranges held only 72% of outcomes before the 2021–22 crisis. The objective is mean-variance, so this
+doesn't change the advised share. The trade-off chart shows expected bill vs this bad case for every h.
 
 ## 5. Validation (out of sample, `validation.py`)
 At 76 month ends from June 2020 the model is fitted on data up to that date only (a test proves no look-ahead) and
@@ -49,8 +54,9 @@ afterwards (90–92%). Anchoring to the 30-day proxy hurts at 1 month (the proxy
   and lost to the simple rules.
 * **Other markets, 2020–2025:** the same ranking with NL, DE-LU and BE power (coupled markets, same gas: one history).
 * **Synthetic futures** (`robustness.py`): 8 delivery years on futures simulated from the model, plus 3 named stress
-  paths. Layered plans cut the 95th-percentile worst year by ~20% but cost 20–30% more than staying variable in the
-  median future; fixing 100% made the bad tail worse. The pre-registered block bootstrap failed a price sanity check
+  paths, 1,000 futures. The HedgeWise ladder and the 2-year layered plan cut the 95th-percentile worst year by 12–13%
+  and the biggest jump by 30–37%, but cost 22–29% more than staying variable in the median future; the model-only
+  optimiser barely cut the worst year (−1%); fixing 100% made the jumps worse. The pre-registered block bootstrap failed a price sanity check
   (it copies the 2019–26 upward drift and ignores mean reversion in power) and is not used for conclusions.
 * **Procurement audit** (`audit.py`): a company's real past contracts vs the same strategies on real prices; checked
   against hand calculations in the tests.

@@ -1,6 +1,6 @@
 {
-  "hedge_gas": 0.7,
-  "hedge_power": 0.7,
+  "hedge_gas": 0.5,
+  "hedge_power": 0.5,
   "execution": "tranches",
   "risk_aversion": 0.5,
   "tranches": [
@@ -11,8 +11,8 @@
     "2021-11-01",
     "2021-12-01"
   ],
-  "buy_now_gas": 0.11666666666666665,
-  "buy_now_power": 0.11666666666666665,
+  "buy_now_gas": 0.08333333333333333,
+  "buy_now_power": 0.08333333333333333,
   "fixed_price_now": {
     "gas": 30.539669876098632,
     "power": 77.6648060644329
@@ -28,10 +28,20 @@
     "gas": "proxy (30-day spot + 5%)",
     "power": "proxy (30-day spot, seasonally adjusted + 5%)"
   },
+  "rule": "ladder",
+  "model_target": 0.7,
+  "ladder_cap": 0.5,
+  "prev_target": null,
+  "next_year": null,
+  "model_only": {
+    "hedge_gas": 0.7,
+    "hedge_power": 0.7,
+    "execution": "tranches"
+  },
   "_provenance": {
     "hedgewise_version": "0.7.0",
     "config_file": "config.yaml",
-    "config_hash": "9cbfbda9d6dc",
+    "config_hash": "866f2977de7a",
     "data_hash": "8181ab654204",
     "data_files": {
       "gas_ttf.csv": "eb651645abc9",

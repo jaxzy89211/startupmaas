@@ -461,7 +461,10 @@ def strategy_table(a: object, lang: str) -> pd.DataFrame:
     t = (a.table / 1e3).round(0).astype(int)
     if lang == "nl":
         t = t.rename(columns=nl_cols)
-        t.index = [nl_rows.get(i, i.replace("power", "stroom").replace("now", "nu")) for i in t.index]
+        t.index = [
+            nl_rows.get(i, i.replace("power", "stroom").replace("now", "nu").replace("Model-only", "Alleen model"))
+            for i in t.index
+        ]
     return t
 
 

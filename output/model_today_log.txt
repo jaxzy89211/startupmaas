@@ -3,24 +3,27 @@ Model fitted on data up to 2026-11-23 (2881 days)
   power: log P = ... + 0.71*log gas | AR(1) phi=0.46, nu=2.8, R2=0.38 | last price 240.2
   shock correlation: gas-power -0.02 
 
-                                            expected (kEUR)  p50 (kEUR)  var95 (kEUR)  es95 (kEUR)  worst (kEUR)  best (kEUR)  cost_at_risk (kEUR)
-All variable                                           2020        1828          3693         4815         14565          270                 2795
-Fix 60% now                                            2080        2004          2750         3199          7099         1380                 1118
-Fix 100% now                                           2121        2121          2121         2121          2121         2121                    0
-Tranches (2x, 100%)                                    2121        2118          2180         2204          2301         2006                   83
-HedgeWise (gas 55%, power 55%, 2 tranches)             2075        1989          2837         3339          7711         1296                 1264 
+                                             expected (kEUR)  p50 (kEUR)  var95 (kEUR)  es95 (kEUR)  worst (kEUR)  best (kEUR)  cost_at_risk (kEUR)  shock (kEUR)  bad_case (kEUR)
+All variable                                            2020        1828          3693         4815         14565          270                 2795          5317             5317
+Fix 60% now                                             2080        2004          2750         3199          7099         1380                 1118          3399             3399
+Fix 100% now                                            2121        2121          2121         2121          2121         2121                    0          2121             2121
+Tranches (2x, 100%)                                     2121        2118          2180         2204          2301         2006                   83          2121             2204
+Model-only (gas 55%, power 55%, 2 tranches)             2075        1989          2837         3339          7711         1296                 1264          3559             3559
+HedgeWise ladder (50%, 2 tranches)                      2070        1975          2913         3473          8334         1203                 1403          3719             3719 
 
 Fixed price available today: gas 95.9 EUR/MWh [proxy (30-day spot + 5%)], power 199.4 EUR/MWh [proxy (30-day spot, seasonally adjusted + 5%)]
 Delivery Jan 2027 - Dec 2027, Limburg food processor (hypothetical)
-If you stay fully variable: expected bill EUR 2.02m, but in the worst 5% of scenarios EUR 4.82m on average (worst simulated: EUR 14.57m).
-Recommendation (risk aversion 0.5): fix 55% of next year's gas and power, spread over 2 monthly tranches (2026-11, 2026-12); buy about 28% gas / 28% power this month.
-That cuts the bad-case bill (ES95) by EUR 1,476k for an expected extra cost of EUR 56k (the hedging premium).
+If you stay fully variable: expected bill EUR 2.02m; bad case EUR 5.32m (2021->22-size shock).
+Recommendation (HedgeWise ladder, pre-registered 2026-11-23; model target 55%, kept between 40% and 50%): fix 50% of next year's gas and power, spread over 2 monthly tranches (2026-11, 2026-12); buy about 25% gas / 25% power this month.
+That cuts the bad case by EUR 1,598k for an expected extra cost of EUR 50k (the hedging premium).
+Also start 2028: buy 20% of its volume this month, 40% by December (the ladder's base layer).
+The bad case is never lower than a repeat of the 2021->2022 price shock: the model's 12-month ranges were too narrow before that crisis (72% instead of 90% of outcomes).
 
 Stress scenarios (historical, NOT forecasts), EUR k:
   2022 prices repeat: implied average price gas 124, power 243 EUR/MWh
-    All variable 2,670 | HedgeWise 2,368 | Fix 60% now 2,341 | Fix 100% now 2,121
+    All variable 2,670 | HedgeWise 2,396 | Fix 60% now 2,341 | Fix 100% now 2,121
   A shock as big as 2021→2022, from today: implied average price gas 253, power 471 EUR/MWh, multiplier gas x2.81, power x2.35
-    All variable 5,317 | HedgeWise 3,559 | Fix 60% now 3,399 | Fix 100% now 2,121
-Provenance: config 9cbfbda9d6dc · data 8181ab654204 (2019-01-02..2026-11-23) · v0.7.0
+    All variable 5,317 | HedgeWise 3,719 | Fix 60% now 3,399 | Fix 100% now 2,121
+Provenance: config 866f2977de7a · data 8181ab654204 (2019-01-02..2026-11-23) · v0.7.0
 
 Charts and tables written to /Users/brunokardas/hedgewise/output/  (analysis_2026-11-23.png, fit_2026-11-23.png)

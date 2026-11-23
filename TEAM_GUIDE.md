@@ -82,16 +82,18 @@ Click **Vergelijk met de strategieën** (about a minute the first time). You get
 | Number | Meaning |
 |---|---|
 | **Verwachte rekening / Expected bill** | Average gas + power commodity bill for next calendar year over thousands of simulated price paths, if they buy everything at the variable (day-ahead) price. |
-| **Slecht scenario / Bad case** | The average of the worst 5% of those paths ("expected shortfall"). Not the worst case; a plausible bad year. |
-| **Slecht scenario met HedgeWise** | The same bad case if they follow our plan (fix the advised share in monthly steps). The green number is how much the plan takes off. |
+| **Slecht scenario / Bad case** | The higher of two numbers: the average of the worst 5% of the simulated paths, and the bill if a price shock as big as 2021→2022 started today. The small label under it says which one ("from the model" / "from the 2021->22 shock"). We do this because our model's ranges were too narrow before the 2021–22 crisis. Not the worst case; a plausible bad year. |
+| **Slecht scenario met HedgeWise** | The same bad case if they follow our plan, the **HedgeWise ladder** (fix the advised share in monthly steps). The green number is how much the plan takes off. |
 | **Advies: deel vastzetten / Share to fix** | Share of next year's volume to fix now, spread over the remaining monthly buying dates before January. |
 | **The trade-off chart** | Every share from 0% to 100%: right = bigger bad case, up = dearer on average. In the model, fixing more costs a little more on average (the ~5% premium inside fixed prices) and removes some of the bad case. The star is our advice. |
 | **Wat als 2022 zich herhaalt?** | Two historical stress tests, not forecasts: the 2022 prices exactly, and a shock as big as 2021→2022 starting from today's prices. |
 | **Past contracts table** | What they actually paid per year (commodity only) next to what 5 simple strategies would have cost with the same volumes and the real prices. |
 
-All numbers are **commodity cost only**: no network costs, energy tax, VAT or supplier margin. Today the dashboard
-advises 60% (5,000 scenarios); the PDF and the command line use 10,000 scenarios and say 55%. The advice moves by
-about 5 points with the number of scenarios; that's noise, not a different view.
+All numbers are **commodity cost only**: no network costs, energy tax, VAT or supplier margin. **Our advice is the
+HedgeWise ladder**, our rule since 23 Nov 2026 (`PREREGISTRATION.md`): the model proposes a share (today 55–60%) and
+the ladder keeps it between 40% and last season's share + 10 points; for a new client that means at most 50%, which
+is today's advice. It also says to start next year's 40% base layer in the second half of the year. The "Model-only"
+option in the full dashboard is the model's own share: not recommended (it buys most when prices are already high).
 
 ## 5. What we may and may not claim
 
@@ -99,9 +101,11 @@ about 5 points with the number of scenarios; that's noise, not a different view.
 * "Over 2021–2025, fixing 60% in monthly steps or layering over two years cut the worst year by 7–21% versus staying
   variable, for 3–5% more in total. Fixing 100% once a year in October was the most expensive habit: 25% more than
   staying variable, and the worst year was 60% higher." (RESULTS.md, real prices.)
-* "In thousands of simulated futures, a two-year layered plan cuts the bad tail (the worst year in 1 of 20 futures)
-  by about 20%, but in a typical future it costs more than staying variable. It's insurance, not a way to save
-  money."
+* "In 1,000 simulated futures, our ladder cuts the bad tail (the worst year in 1 of 20 futures) by about 13% and the
+  biggest year-on-year jump by about a third, but in a typical future it costs more than staying variable. It's
+  insurance, not a way to save money."
+* "The ladder is our rule, pre-registered on 23 November 2026. 2021–2025 is in-sample: we will score every year from
+  2027 on out of sample, with measures we fixed in advance."
 * "The same pattern holds with German and Belgian power prices." (Coupled markets, same gas: not independent proof.)
 * "We tested the model on 76 monthly forecasts made with only the data available at the time. Outside the 2021–22
   build-up its 90% ranges held about 90% of outcomes; before the crisis no statistical model saw it coming. That's
@@ -111,7 +115,10 @@ about 5 points with the number of scenarios; that's noise, not a different view.
 * "HedgeWise saves you money" or "beats the market". It doesn't, on average; it reduces the bad years.
 * "Our optimiser beats simple rules." In the backtest and in simulations it doesn't (it hedges most when prices are
   already high).
-* Anything with the "HedgeWise ladder" as proof: it was designed after seeing 2021–2025.
+* The ladder's 2021–2025 numbers as proof: it was designed after seeing 2021–2025 (in-sample). Say "our rule from now
+  on", not "the rule that won".
+* "The bad case is the worst that can happen." It's a plausible bad year (the worse of the model and a 2021→22 repeat),
+  not a ceiling.
 * "Proven", "always", "guaranteed". Five years is a tiny sample.
 * Exact euros for a specific company without their own data and their real contract prices.
 * Green-investment paybacks as firm numbers: the capex values are placeholders, and today's high prices flatter
@@ -139,11 +146,14 @@ about 5 points with the number of scenarios; that's noise, not a different view.
 4. **"Then why not stay variable?"** On average it is cheapest, in the backtest and in simulations. But 2022 doubled
    the bill in one year; most companies can't absorb that. Hedging is insurance.
 5. **"How much does your advice cost the client?"** About 5% on the hedged part (the premium in fixed prices). Today:
-   roughly €10k a year more on average per extra 10% fixed, for ~€260k less in the bad case (default company).
-6. **"Does your optimiser beat simple rules?"** No, and we say so. It reacts to volatility after the fact. We sell the
-   discipline (layered monthly buying) and the measurement, not a black box.
-7. **"Five years of backtest is nothing."** Agreed. We added three countries, 6 years, and hundreds of simulated 8-year
-   futures. The direction holds: layered buying cuts the bad tail and costs money in normal times.
+   roughly €10k a year more on average per extra 10% fixed, for ~€310k less in the bad case (default company).
+6. **"Does your optimiser beat simple rules?"** No, and we say so: it reacts to volatility after the fact. That's why our
+   rule is the HedgeWise ladder (pre-registered on 23 Nov 2026): a fixed 40% base layer two years ahead plus a model
+   top-up whose rise is capped at 10 points a season. Its 2021–2025 numbers are in-sample; we score it out of sample
+   from 2027.
+7. **"Five years of backtest is nothing."** Agreed. We added three countries, 6 years, and 1,000 simulated 8-year
+   futures. The direction holds: layered buying cuts the bad tail (−12 to −13% in the worst year of 1 in 20 futures)
+   and costs money in normal times.
 8. **"Your fixed price isn't a real forward price."** Correct: it's recent spot + 5%. The code reads real EEX/ICE
    forwards as soon as we get them (university terminal); then the numbers will move.
 9. **"Isn't this what energy brokers do?"** Brokers sell contracts and get paid per contract. We're independent,

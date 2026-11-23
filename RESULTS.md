@@ -1,5 +1,10 @@
 # HedgeWise: results on real data (v0.7, 23 Nov 2026)
 
+**Pitch freeze (23 Nov 2026):** the **HedgeWise ladder is our rule, pre-registered on 23 Nov 2026**
+(`PREREGISTRATION.md`, rule commit `5023af4`); its 2021–2025 numbers are **in-sample**. The **bad case** shown to
+clients is the higher of the model's ES95 and a repeat of the 2021→2022 shock. The plain optimiser is kept as
+"Model-only" (not recommended: procyclical). Every number allowed on a slide is in `PITCH_NUMBERS.md`.
+
 **v0.7** adds evidence and tools; the model maths and the 2021–2025 numbers are unchanged (golden test):
 - **Robustness:** synthetic 8-year futures and stress paths, and the backtest on German and Belgian power, 2020–2025
 - **Procurement audit:** a company's real past contracts vs the strategies ("what would HedgeWise have saved you?")
@@ -30,8 +35,8 @@ Real Dutch day-ahead power and TTF gas prices, 2019 to today. Company: the hypot
 
 > **Mid-sized companies either stay fully variable or fix 100% once a year. Over 2021–2025 both were the most expensive way to buy energy in the years that hurt. Fixing 60% in monthly tranches, or layering over two years, cut the worst year by 7–21% and the biggest year-on-year jump by 21–41% versus staying variable, for 3–5% more over five years. Against the "fix 100% in October" habit it was cheaper *and* safer: −16 to −17% total, worst year cut by 43–51%.**
 
-⚠️ "For 3–5% more" is what 2021–2025 cost. In 200 synthetic futures from the model the layered plan cost 29% more
-than staying variable in the median future and paid off only in the bad tail (P95 worst year −20%); see Robustness.
+⚠️ "For 3–5% more" is what 2021–2025 cost. In 1,000 synthetic futures from the model the layered plan cost 29% more
+than staying variable in the median future and paid off only in the bad tail (P95 worst year −12%); see Robustness.
 Say "insurance against the bad year", not "almost free".
 
 Use `output/pitch_cycle.png` as the main chart and `output/pitch_2022.png` as the "2022 story" chart. They tell the same story; 2022 alone cherry-picks the year where hedging won.
@@ -71,7 +76,7 @@ The policy (`policy_plan` in `hedgewise_model.py`) takes the optimizer's target 
 * **What would address it** (not done, because the cap mustn't be tuned on these results): carry the previous season's target over as the starting point of the cap, or add mean reversion to the gas model. Decide either one on reasoning first, then test it once.
 * **Pitch implication:** sell the *discipline* (60% in tranches or a 2-year ladder) as the recommendation, and the model as the tool that *measures* the risk (bad-case bill, stress test, frontier). Don't claim the optimizer beats simple rules.
 
-### HedgeWise ladder: ⚠️ designed AFTER seeing the 2021–2025 results, so this backtest is NOT independent evidence
+### HedgeWise ladder: our rule, pre-registered on 23 Nov 2026. ⚠️ Designed AFTER seeing 2021–2025, so this backtest is in-sample, NOT independent evidence
 
 **Rule:** buy 40% in 6 monthly tranches in H2 of Y-2. In H2 of Y-1, top up in equal monthly tranches to the model's target (γ = 0.5). The target may not exceed the **previous season's** target by more than 10 points. "Previous season's target" is the ladder's target on the last decision date for delivery year Y-1. For 2021 there is no previous season in the data, so the 40% base layer is used as the starting point (cap 50%). The rule combines what the earlier sections showed: layering across two years helped, and between-season jumps hurt. **That's exactly why its good numbers below prove nothing yet**; it needs testing on data it wasn't designed on (other years, other markets, or the coming seasons).
 
@@ -92,15 +97,34 @@ Per year: 729 / 1,584 / 1,612 / 1,894 / 893. The ladder fixed 48%, 50%, 60%, 65%
 * **"Fix 60% at once in July" has the best numbers in the table (total €5.56m), but that's luck.** Fixing 60% once in a different month of the same half-year gives a total of €5.56m–€7.60m and a worst year of €1.85m–€3.60m. Don't pitch it.
 * **The HedgeWise optimizer doesn't beat the simple rules in this backtest.** It hedges *more* when volatility is high, and volatility is high when prices are already high (H2 2022), so it locked in crisis prices for 2023. Model-driven hedging on its own is procyclical. Honest framing: the model's job is to *measure* the risk and size the hedge; the *discipline* (tranches and layering) is what protects you. Fixing the procyclicality (a vol-target that doesn't chase, or mean reversion in gas) is the next modelling step.
 
-## What the model says (anchored, γ = 0.5, 10,000 scenarios)
+## What the model says (anchored, 10,000 scenarios; recommendation = the HedgeWise ladder)
 
-| As of | Delivery | Expected bill, all variable | Bad case (ES95), all variable | HedgeWise: share fixed | Bad case with HedgeWise | Extra expected cost |
+The plan is the pre-registered ladder: the optimiser's share at γ = 0.5 ("model target"), kept between the 40% base
+layer and last season's target + 10 points (a new client has no last season: at most 50%). Bad case = the higher of
+the model's ES95 and the 2021→2022-shock bill (source in brackets).
+
+| As of | Delivery | Expected bill, all variable | Bad case, all variable | Model target → **ladder** | Bad case with the ladder | Extra expected cost |
 |---|---|---|---|---|---|---|
-| 30 Jun 2021 | 2022 | €0.71m | €1.91m | 70% | €1.27m | €25k |
-| 30 Jun 2022 | 2023 | €2.31m | €7.96m | 90% | €4.28m | €104k |
-| 23 Nov 2026 (today) | 2027 | €2.02m | €4.82m | 55% | €3.34m | €56k |
+| 30 Jun 2021 | 2022 | €0.71m | €1.91m (model) | 70% → **50%** | €1.44m | €18k |
+| 30 Jun 2022 | 2023 | €2.31m | €7.96m (model) | 90% → **50%** | €5.74m | €58k |
+| 23 Nov 2026 (today) | 2027 | €2.02m | **€5.32m (stress)** | 55% → **50%** | **€3.72m (stress)** | €50k |
 
-Today's frontier: each extra 10% fixed costs about €10k on average and removes about €260k from the bad case. The exact recommended share moves by ±5 percentage points with the number of scenarios (5,000 in the dashboard, which advises 60% today, vs 10,000 here).
+Today the ladder also starts 2028: buy 20% of 2028's volume this month and 40% by December (its base layer).
+Today's frontier: each extra 10% fixed costs about €10k on average and removes about €311k from the (honest) bad
+case. The model target moves by ±5 points with the number of scenarios (the dashboard uses 5,000); the ladder's cap
+(50%) binds today either way.
+
+### The honest bad case (new at the pitch freeze)
+
+Our model's 12-month ranges were too narrow before the 2021–22 crisis (they held 72% of outcomes instead of 90%; see
+Model validation), so the bad case shown to clients is **never lower than a repeat of the 2021→2022 price shock**:
+for every strategy and every point on the trade-off chart it is the higher of (a) the model's ES95 (average of the
+worst 5% of scenarios) and (b) the bill in the "shock as big as 2021→2022, from today" stress scenario, labelled
+"model" or "stress". Today the shock sets the bad case for every strategy except fixing 100% (now: both equal, €2.12m; in tranches: the
+model's ES95 is higher); on 30 Jun
+2021 and 30 Jun 2022 the model's ES95 was the higher one. **The recommendation is not affected:** the optimiser's
+objective is mean-variance (E + γ/2·Var/E) and doesn't use the bad case, and the ladder's cap doesn't either, so the
+advised share is the same as before; only the bad-case numbers shown next to it change.
 
 ## Stress test: "what if 2022 happens again?" (two scenarios, revised)
 
@@ -113,15 +137,15 @@ The fixed share is priced at today's fixed price. "Implied avg" is the volume-we
 
 | Decision date (plan) | Scenario | Implied avg gas / power (€/MWh) | All variable | HedgeWise plan | Fix 60% now | Fix 100% now |
 |---|---|---|---|---|---|---|
-| 30 Jun 2021 (fix 70%) | 2022 repeats | 124 / 243 | 2.67 | 1.32 | 1.52 | 0.75 |
-| | shock from today | 80 / 183 | 1.86 | 1.08 | 1.19 | 0.75 |
-| 30 Jun 2022 (fix 90%) | 2022 repeats | 124 / 243 | 2.67 | 2.45 | 2.53 | 2.43 |
-| | shock from today | 295 / 527 | 6.10 | 2.80 | 3.90 | 2.43 |
-| **23 Nov 2026, today (fix 55%)** | 2022 repeats | 124 / 243 | **2.67** | **2.37** | 2.34 | 2.12 |
-| | shock from today | 253 / 471 | **5.32** | **3.56** | 3.40 | 2.12 |
+| 30 Jun 2021 (ladder 50%) | 2022 repeats | 124 / 243 | 2.67 | 1.71 | 1.52 | 0.75 |
+| | shock from today | 80 / 183 | 1.86 | 1.30 | 1.19 | 0.75 |
+| 30 Jun 2022 (ladder 50%) | 2022 repeats | 124 / 243 | 2.67 | 2.55 | 2.53 | 2.43 |
+| | shock from today | 295 / 527 | 6.10 | 4.26 | 3.90 | 2.43 |
+| **23 Nov 2026, today (ladder 50%)** | 2022 repeats | 124 / 243 | **2.67** | **2.40** | 2.34 | 2.12 |
+| | shock from today | 253 / 471 | **5.32** | **3.72** | 3.40 | 2.12 |
 
 * Sanity check: as of 30 Jun 2021, "2022 repeats" is what actually happened, and its all-variable bill (€2.67m) equals the realised 2022 bill in the backtest.
-* Today's fixed prices (gas €96, power €199/MWh) are already close to the 2022 averages, so "2022 repeats" adds only about €0.65m to a variable bill. The shock scenario is the one that hurts: €5.32m variable vs €3.56m with the plan.
+* Today's fixed prices (gas €96, power €199/MWh) are already close to the 2022 averages, so "2022 repeats" adds only about €0.65m to a variable bill. The shock scenario is the one that hurts: €5.32m variable vs €3.72m with the ladder plan.
 * By construction, fixing more always looks better in a price-rise scenario. The frontier and the backtest show the other side (2023, when prices fell).
 * It appears in the dashboard, the PDF and the CLI (with the implied prices), and in `output/stress_<date>.png`.
 
@@ -275,38 +299,41 @@ instead of 4,000** and one risk aversion (γ = 0.5). Three families, defined bef
 * **stress:** three named paths: "2022 repeats" (the 2021→2022 shock from today, in 2028–29), "slow 3-year rise"
   (×3 from mid-2027) and "spike then crash" (×4 in 3 months in 2028, then down to 0.5× today's level).
 
-**Sample size: 200 histories per family so far** (plus the 3 stress paths). The run is chunked and resumable, and is
-still going towards 1,000 per family; the tables below will be updated when it finishes. Measures per strategy:
+**Sample size: 1,000 histories per family** (the model family; the bootstrap family has 999: history 542 produced
+non-finite prices and is reported as failed, not dropped silently) plus the 3 stress paths. Measures per strategy:
 median 8-year total, 95th percentile (P95) of the worst single year and of the biggest year-on-year jump, and "wins"
 = the share of histories where the strategy has a lower worst year than all-variable **and** costs less than 8% more
-in total. Files: `output/robustness_table.csv`, `robustness_histories.csv`, `robustness.png`.
+in total. Files: `output/robustness_table.csv`, `robustness_histories.csv`, `robustness.png`, `robustness_summary.txt`.
 
-**Model family (n = 200), €m over 8 years:**
+**Model family (n = 1,000), €m over 8 years:**
 
 | Strategy | Median total | P95 worst year (vs variable) | P95 biggest jump (vs variable) | Wins |
 |---|---|---|---|---|
-| All variable | 5.46 | 15.7 | 8.2 | – |
-| Fix 100% in Oct | 7.36 | 18.5 (+17%) | 8.9 (+8%) | 10% |
-| Fix 60% at once (Jul) | 6.80 | 15.2 (−4%) | 6.6 (−20%) | 18% |
-| Tranches 6× (100%) | 7.13 | 18.9 (+20%) | 9.4 (+14%) | 6% |
-| Tranches 6× (60%) | 6.45 | 15.2 (−4%) | 5.7 (−31%) | 18% |
-| Layered 2 years (40+40%) | 7.27 | **12.6 (−20%)** | 4.8 (−42%) | 18% |
-| HedgeWise policy γ=0.5 | 6.52 | 16.7 (**+6%**) | 6.9 (−17%) | 22% |
-| HedgeWise ladder (in-sample rule) | 6.82 | **12.6 (−20%)** | **4.5 (−46%)** | 23% |
+| All variable | 5.92 | 10.9 | 4.8 | – |
+| Fix 100% in Oct | 7.39 | 11.6 (+6%) | 6.5 (+36%) | 10% |
+| Fix 60% at once (Jul) | 7.10 | 10.7 (−2%) | 4.7 (−2%) | 18% |
+| Tranches 6× (100%) | 7.45 | 11.0 (+0%) | 6.1 (+28%) | 7% |
+| Tranches 6× (60%) | 6.85 | 10.7 (−2%) | 4.4 (−9%) | 17% |
+| Layered 2 years (40+40%) | 7.64 | **9.6 (−12%)** | 3.3 (−30%) | 18% |
+| Model-only (HedgeWise policy γ=0.5) | 6.77 | 10.8 (−1%) | 4.1 (−14%) | 20% |
+| **HedgeWise ladder** (our rule; pre-registered 23 Nov 2026) | 7.18 | **9.6 (−13%)** | **3.0 (−37%)** | **22%** |
 
 (The uncapped optimiser column "HedgeWise (risk aversion 0.5)" is left out: its summary numbers equal the policy's
-to within €10k (identical trades in 46% of histories; where the 20-point cap binds, totals differ by up to €0.65m).)
+to within €13k; identical trades in 46% of histories, totals differ by up to €1.07m where the
+20-point cap binds.) With 200 histories the tail cuts looked larger (−20% for the ladder and the layered rule) and the
+model-only policy looked worse than variable (+6%); with 1,000 those are −13%, −12% and −1%. The 1,000 numbers are
+the ones to use.
 
-**Who is best how often** (share of the 200 model histories in which a strategy has the lowest value):
+**Who is best how often** (share of the 1,000 model histories in which a strategy has the lowest value):
 
 | | Lowest total | Lowest worst year | Lowest biggest jump |
 |---|---|---|---|
-| All variable | **84%** | **40%** | 5% |
-| HedgeWise ladder | 1% | 32% | 40% |
-| Layered 2 years | 4% | 10% | 40% |
-| HedgeWise policy | 0% | 5% | 2% |
+| All variable | **84%** | **44%** | 5% |
+| HedgeWise ladder | 2% | 31% | **39%** |
+| Layered 2 years | 4% | 9% | 37% |
+| Model-only (HedgeWise policy) | 0% | 3% | 5% |
 | Tranches 6× (60%) | 0% | 2% | 4% |
-| Fix 100% in Oct | 7% | 4% | 2% |
+| Fix 100% in Oct | 6% | 2% | 1% |
 
 **Named stress paths, €m (8-year total / worst year):**
 
@@ -316,35 +343,35 @@ to within €10k (identical trades in 46% of histories; where the 20-point cap b
 | Fix 100% in Oct | 18.9 / 8.5 | 53.5 / 9.8 | 20.6 / 9.3 |
 | Tranches 6× (60%) | 15.7 / 5.1 | 53.3 / 8.3 | 18.3 / 5.8 |
 | Layered 2 years | 16.8 / 4.4 | **50.9** / 8.1 | 19.2 / 5.0 |
-| HedgeWise policy γ=0.5 | 16.5 / 5.7 | 53.1 / **7.9** | 17.5 / 5.3 |
+| Model-only (HedgeWise policy) | 16.5 / 5.7 | 53.1 / **7.9** | 17.5 / 5.3 |
 | HedgeWise ladder | 16.2 / **3.6** | 51.2 / 8.4 | 18.4 / **4.5** |
 
 **What this shows, including where our preferred strategies lose:**
 1. **Hedging is insurance, and in the model's world it usually costs more than 5%.** In the median history every hedge
-   costs more than staying variable: +13% (HedgeWise policy) to +29% (layered) over 8 years. All-variable has the
+   costs more than staying variable: +14% (model-only) to +29% (layered); the ladder +22%. All-variable has the
    lowest 8-year total in 84% of model histories. The reason: the model is a martingale with high volatility, so in
    most paths prices drift down after a hedge is locked in, and the few paths where they explode carry the average.
    The real-data claim "3–5% more over five years" belongs to 2021–2025; it is not a general cost of hedging.
-2. **The benefit is in the tail, and only for the layered rules.** The 2-year ladder and the HedgeWise ladder cut the
-   P95 worst year by 20% and the P95 jump by 42–46%. 60% tranches barely move the P95 worst year (−4%) but cut the
-   jump by 31%. Fixing 100% (in October or in tranches) makes both the bad year and the jump *worse* than staying
-   variable: it concentrates the price risk into one decision season.
-3. **The HedgeWise policy (the model-driven optimiser) fails on worst year here too:** P95 worst year +6% versus
-   all-variable, the same procyclicality seen in 2021–2025. It has the cheapest median among the hedges (+13%) and
-   wins in 22% of histories, but not on the measure we sell.
-4. **"Wins" is low for everything (6–23%).** Lower worst year *and* less than 8% extra is rarely both true in the
-   model's world. The HedgeWise ladder (23%) and the policy (22%) are highest, the layered rule 18%.
+2. **The benefit is in the tail, and mainly for the layered rules.** The HedgeWise ladder and the 2-year ladder cut
+   the P95 worst year by 13% and 12% and the P95 jump by 37% and 30%. 60% tranches barely move the P95 worst year
+   (−2%). Fixing 100% (in October or in tranches) makes the jump much *worse* (+28 to +36%) and the bad year no
+   better: it concentrates the price risk into one decision season.
+3. **The model-only policy barely helps on the worst year** (P95 −1% vs variable), the same procyclicality as in
+   2021–2025. It has the cheapest median among the hedges (+14%), but not the protection we sell.
+4. **"Wins" is low for everything (7–22%).** Lower worst year *and* less than 8% extra is rarely both true in the
+   model's world. The HedgeWise ladder is highest (22%), the model-only policy 20%, the layered rule 18%.
 5. **Stress paths:** a disciplined hedge cuts the worst year in "2022 repeats" (ladder 3.6, layered 4.4 vs 5.4) and in
    "spike then crash" (4.5–5.0 vs 7.0), but all-variable is cheapest over 8 years in both: after the shock prices
    come down and the hedges keep paying today's high price. Only in the slow 3-year rise do the layered rules save
    money (−5 to −6%); there, no strategy changes the worst year much (7.9–9.8).
-6. **The HedgeWise ladder is still in-sample** (designed after seeing 2021–2025). It does well here on data it wasn't
-   designed on, which is some evidence, but the synthetic futures come from a model fitted on the same history.
+6. **The HedgeWise ladder is our pre-registered rule (PREREGISTRATION.md, 23 Nov 2026); 2021–2025 is in-sample.**
+   It does best here on data it wasn't designed on, which is some evidence, but the synthetic futures come from a
+   model fitted on the same history. The real test is out of sample: every delivery year from 2027 on.
 7. **The bootstrap family fails a sanity check and is not used for any conclusion.** Chaining random 30-day blocks of
    2019–2026 daily changes over 9 years (a) copies the 2019–2026 upward drift (gas €22 → €91; median simulated 2035
    gas price €589/MWh) and (b) ignores that power mean-reverts after spikes and negative prices (one 30-day block's
    power change has a standard deviation of 0.59 in logs), so the median 2035 power price is about €5,000/MWh and the
-   P95 runs to absurd values. Its "wins" (46–78%) mostly reflect the built-in upward drift. The design was fixed
+   P95 runs to absurd values. Its "wins" (44%–74%) mostly reflect the built-in upward drift. The design was fixed
    before the run and is reported as it is; a better bootstrap (gas blocks + power from the fitted power-on-gas
    regression, drift removed) is a to-do, to be defined before it is run.
 8. **Caveats:** the model family inherits the model's limits (no mean reversion; validation shows 12-month bands too
