@@ -1,0 +1,47 @@
+Downloading NL day-ahead power from 2015 ...
+   NL (NL) 2015: 8759 rows
+   NL (NL) 2016: 8784 rows
+   NL (NL) 2017: 8760 rows
+   NL (NL) 2018: 8760 rows
+   NL (NL) 2019: 8760 rows
+   NL (NL) 2020: 8784 rows
+   NL (NL) 2021: 8760 rows
+   NL (NL) 2022: 8760 rows
+   rate-limited, waiting 30s
+   NL (NL) 2023: 8760 rows
+   NL (NL) 2024: 8784 rows
+   NL (NL) 2025: 15387 rows
+   NL (NL) 2026: 31392 rows
+   saved 4339 days (2015-01-05 .. 2026-11-23) -> data/extended/power_nl_daily.csv
+Downloading BE day-ahead power from 2015 ...
+   rate-limited, waiting 30s
+   BE (BE) 2015: 8759 rows
+   BE (BE) 2016: 8784 rows
+   BE (BE) 2017: 8760 rows
+   BE (BE) 2018: 8760 rows
+   rate-limited, waiting 30s
+   BE (BE) 2019: 8760 rows
+   BE (BE) 2020: 8784 rows
+   BE (BE) 2021: 8760 rows
+   BE (BE) 2022: 8760 rows
+   BE (BE) 2023: 8760 rows
+   BE (BE) 2024: 8784 rows
+   BE (BE) 2025: 15387 rows
+   BE (BE) 2026: 31392 rows
+   saved 4341 days (2015-01-05 .. 2026-11-23) -> data/extended/power_be_daily.csv
+Downloading DE-LU day-ahead power from 2015 ...
+   DE-LU (DE-AT-LU) 2015: 8759 rows
+   DE-LU (DE-AT-LU) 2016: 8784 rows
+   DE-LU (DE-AT-LU) 2017: 8760 rows
+   DE-LU (DE-AT-LU) 2018: 6551 rows
+   DE-LU (DE-LU) 2018: 2209 rows
+   DE-LU (DE-LU) 2019: 8760 rows
+   DE-LU (DE-LU) 2020: 8784 rows
+   DE-LU (DE-LU) 2021: 8760 rows
+   DE-LU (DE-LU) 2022: 8760 rows
+   DE-LU (DE-LU) 2023: 8760 rows
+   DE-LU (DE-LU) 2024: 8784 rows
+   DE-LU (DE-LU) 2025: 15387 rows
+   DE-LU (DE-LU) 2026: 31488 rows
+   saved 4346 days (2015-01-01 .. 2026-11-24) -> data/extended/power_de_lu_daily.csv
+   gas: 2286 days (2017-10-23 .. 2026-11-23) -> data/extended/gas_ttf.csv
