@@ -77,6 +77,40 @@ Click **Vergelijk met de strategieën** (about a minute the first time). You get
 
 ![Past contracts, Dutch](docs/img/04_interview_contracts_nl.png)
 
+## 3b. After the interview: the pilot report (Janek and Bruno, on the laptop)
+
+For every company that shared documents. About 10 minutes.
+
+1. **Consent first.** The interviewee must have said yes to the text in `CONSENT.md` (an email reply is enough).
+   Save that email as `consent.txt` in the company's folder (step 2).
+2. **Make a private folder** for the company: `data/private/<company>/` (Finder: open the `hedgewise` folder → `data` →
+   `private`, make a new folder with the company's name). Put everything they gave you in it: PDF bills, annual
+   statements, contracts, a CSV/Excel export from their supplier portal, or a table of past contracts
+   (columns year, commodity, share, price, unit, fixed_on, like `data/audit_example.csv`).
+   **This folder never leaves the laptop** (it is ignored by git, and a check blocks it even if someone tries).
+3. **Run the pilot** in Terminal:
+   ```
+   cd ~/hedgewise
+   source .venv/bin/activate
+   python pilot.py "data/private/<company>" --alias "Bedrijf A"
+   ```
+   (`--alias` puts "Bedrijf A" instead of the company name in every output. Leave it out only if they agreed to be
+   named.)
+4. **Check the table** it prints: the gas and power per month (and where each number was read), and the past
+   contracts. Lines starting with `FLAG:` need a look (a month 3× the others, missing months, two documents that
+   disagree, a contract share set to 100% because the document didn't say). To correct anything: type `n`, open
+   `pilot_numbers.csv` or `pilot_contracts.csv` in the folder (Excel or Numbers), fix the number, save, and run the
+   same command again. It then uses your corrections. When everything is right, type `y`.
+5. **Read `sanity_check.pdf`** (one page, for the team only): which documents were read, how, every flag, the
+   numbers used and the advice. Don't send it to the company.
+6. **Send** `report_bedrijf_a_nl.pdf` (or `_en`) from your own mailbox. Page 2 compares their past contracts with our
+   strategies, if they gave any. If they did better than our strategies, say so.
+7. **After the competition** (by 31 March 2027): delete the folder unless they agreed in writing to keep it.
+
+Scanned bills (photos) can't be read automatically: type their monthly numbers into `pilot_numbers.csv` (columns
+month, gas_m3, power_kwh). Never use the AI option (`--ai`) unless the company ticked "AI-dienst gebruiken" on the
+consent form.
+
 ## 4. What each number means
 
 | Number | Meaning |

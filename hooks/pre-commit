@@ -1,0 +1,12 @@
+#!/bin/sh
+# HedgeWise pre-commit hook: blocks confidential and licensed files, even when added with `git add -f`.
+# Install once per clone:  git config core.hooksPath hooks
+blocked=$(git diff --cached --name-only --diff-filter=ACMR | grep -E \
+  '^data/private/|^clients/private/|^data/forwards\.(csv|xlsx)$|^output/(history|monitor|forwards_run)/|\.bundle$' )
+if [ -n "$blocked" ]; then
+  echo "BLOCKED by hooks/pre-commit: these files must never be committed (client data or licensed prices):" >&2
+  echo "$blocked" | sed 's/^/  /' >&2
+  echo "Unstage them with: git restore --staged <file>" >&2
+  exit 1
+fi
+exit 0
