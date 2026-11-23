@@ -1,0 +1,27 @@
+{
+  "hedge_gas": 0.9,
+  "hedge_power": 0.9,
+  "execution": "tranches",
+  "risk_aversion": 0.5,
+  "tranches": [
+    "2022-06-30",
+    "2022-08-01",
+    "2022-09-01",
+    "2022-10-01",
+    "2022-11-01",
+    "2022-12-01"
+  ],
+  "buy_now_gas": 0.15,
+  "buy_now_power": 0.15,
+  "fixed_price_now": {
+    "gas": 112.10723957061768,
+    "power": 223.1320089965485
+  },
+  "budget": null,
+  "mode": "risk_aversion",
+  "objective": "mean_variance",
+  "anchor_scale": {
+    "gas": 0.742572976782243,
+    "power": 0.8970631515448247
+  }
+}

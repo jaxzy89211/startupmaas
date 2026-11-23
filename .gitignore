@@ -1,0 +1,8 @@
+.venv/
+__pycache__/
+.DS_Store
+.Rhistory
+backup_v02/
+hedgewise_v0.3.zip
+output/_*
+.pytest_cache/
