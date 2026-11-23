@@ -11,3 +11,4 @@ output/_*
 data/forwards.csv
 data/forwards.xlsx
 .coverage
+output/robustness_chunks/

@@ -85,3 +85,40 @@ def test_summary_definitions():
     assert s.loc["X", "pct_beats_variable"] == pytest.approx(1 / 3)
     assert s.loc["All variable", "pct_beats_variable"] == 0
     assert s.loc["X", "median_total"] == 105
+
+
+def test_chunked_run_saves_each_chunk_and_resumes(tmp_path, monkeypatch):
+    calls = []
+
+    def fake(task):
+        calls.append(task)
+        if len(calls) == 6:
+            raise RuntimeError("crash in chunk 3")
+        fam, key = task
+        return pd.DataFrame(
+            [
+                {
+                    "strategy": "All variable",
+                    "total": 1.0,
+                    "worst_year": 1.0,
+                    "max_jump": 0.0,
+                    "family": fam,
+                    "history": str(key),
+                }
+            ]
+        )
+
+    monkeypatch.setattr(rb.hw, "OUT", tmp_path)
+    monkeypatch.setattr(rb, "_task", fake)
+    monkeypatch.setitem(rb._STATE, "ready", True)  # skip the real worker init
+    with pytest.raises(RuntimeError):
+        rb.run_chunked(2, workers=1, chunk_size=2)  # 7 tasks -> 4 chunks; dies in the 3rd
+    saved = sorted(p.name for p in tmp_path.rglob("chunk_*.csv"))
+    assert saved == ["chunk_0000.csv", "chunk_0001.csv"]  # the finished chunks are on disk, no partial file
+    calls.clear()
+    per = rb.run_chunked(2, workers=1, chunk_size=2)  # resume: only chunks 3 and 4 run
+    assert len(calls) == 3 and len(per) == 7
+    assert set(zip(per.family, per.history, strict=True)) == {(f, str(h)) for f, h in rb.make_tasks(2)}
+    calls.clear()
+    small = rb.run_chunked(1, workers=1, chunk_size=2)  # a smaller run reuses the saved chunks, nothing reruns
+    assert calls == [] and len(small) == 5

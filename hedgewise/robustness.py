@@ -21,7 +21,10 @@ share of histories where it beats all-variable on the worst year AND costs < 8% 
 Speed: the HedgeWise strategies use ROBUSTNESS_PATHS scenarios per decision (instead of 4,000 in backtest.py), and
 model fits are cached per history (a fit is deterministic, so this changes nothing but the run time).
 
-    python robustness.py [--histories 1000] [--workers 8]
+    python robustness.py [--histories 1000] [--workers 4] [--chunk-size 20]
+
+Runs in chunks; every finished chunk is saved under output/robustness_chunks/, so a crash loses at most one
+chunk and rerunning the same command resumes.
 """
 
 from __future__ import annotations
@@ -30,13 +33,14 @@ import argparse
 import os
 import time
 from multiprocessing import Pool
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
 import hedgewise as hw
 from hedgewise import backtest as bt
-from hedgewise.provenance import one_line, save_figure, write_csv
+from hedgewise.provenance import current, one_line, save_figure, write_csv
 from hedgewise.settings import BACKTEST, POWER_FLOOR
 
 ROBUSTNESS_PATHS = 300  # scenarios per HedgeWise decision (backtest.py: 4,000) - for speed, see docstring
@@ -301,23 +305,94 @@ def plot_robustness(summary: pd.DataFrame, per: pd.DataFrame, path: str) -> None
     plt.close(fig)
 
 
+def _run_dir(n_paths: int, chunk_size: int) -> Path:
+    """Where finished chunks are saved; the name pins everything that changes a result, so stale chunks are
+    never mixed in (config, data, scenarios per decision, chunk size)."""
+    prov = current()
+    tag = f"cfg{prov['config_hash']}_data{prov.get('data_hash', 'none')}_paths{n_paths}_chunk{chunk_size}"
+    return hw.OUT / "robustness_chunks" / tag
+
+
+def make_tasks(histories: int) -> list[tuple[str, int | str]]:
+    """Stress histories first, then model/bootstrap interleaved. The order only grows at the end when
+    `histories` grows, so chunks saved by a smaller run are reused by a bigger one."""
+    tasks: list[tuple[str, int | str]] = [("stress", n) for n in STRESS_NAMES]
+    return tasks + [(f, i) for i in range(histories) for f in ("model", "bootstrap")]
+
+
+def _task_ref(task: tuple[str, int | str]) -> pd.DataFrame:
+    """Module-level indirection so tests can replace `_task` (workers=1)."""
+    return _task(task)
+
+
+def run_chunked(histories: int, workers: int, chunk_size: int) -> pd.DataFrame:
+    """Run all tasks in chunks of `chunk_size`, saving each finished chunk to disk before starting the next.
+    A crash loses at most the chunk in progress; rerunning the same command resumes from the saved chunks."""
+    tasks = make_tasks(histories)
+    chunks = [tasks[i : i + chunk_size] for i in range(0, len(tasks), chunk_size)]
+    run_dir = _run_dir(ROBUSTNESS_PATHS, chunk_size)
+    run_dir.mkdir(parents=True, exist_ok=True)
+
+    def keys(chunk: list[tuple[str, int | str]]) -> set[tuple[str, str]]:
+        return {(f, str(h)) for f, h in chunk}
+
+    def done(k: int) -> bool:  # saved, and covers every task of this chunk (a smaller run saves a shorter last one)
+        f = run_dir / f"chunk_{k:04d}.csv"
+        if not f.exists():
+            return False
+        saved = pd.read_csv(f, usecols=["family", "history"], dtype=str)
+        return keys(chunks[k]) <= set(zip(saved.family, saved.history, strict=True))
+
+    todo = [k for k in range(len(chunks)) if not done(k)]
+    print(
+        f"{len(tasks)} histories in {len(chunks)} chunks of {chunk_size}; {len(chunks) - len(todo)} chunks "
+        f"already saved in {run_dir}; {workers} worker processes",
+        flush=True,
+    )
+    t0 = time.time()
+    if todo:
+        if workers == 1:  # in-process (tests, debugging)
+            if not _STATE:
+                _init_worker()
+            pool, mapper = None, lambda f, xs: list(map(f, xs))
+        else:
+            pool = Pool(workers, initializer=_init_worker, maxtasksperchild=50)
+            mapper = lambda f, xs: pool.map(f, xs, chunksize=1)  # noqa: E731
+        try:
+            for j, k in enumerate(todo):
+                part = pd.concat(mapper(_task_ref, chunks[k]), ignore_index=True)
+                tmp = run_dir / f"chunk_{k:04d}.csv.tmp"
+                part.to_csv(tmp, index=False)
+                tmp.replace(run_dir / f"chunk_{k:04d}.csv")  # atomic: a half-written chunk never counts as done
+                el = time.time() - t0
+                print(
+                    f"  chunk {k + 1}/{len(chunks)} saved ({j + 1}/{len(todo)} this run, {el:.0f}s, "
+                    f"~{el / (j + 1) * (len(todo) - j - 1) / 60:.0f} min left)",
+                    flush=True,
+                )
+        finally:
+            if pool is not None:
+                pool.close()
+                pool.join()
+    per = pd.concat(
+        [pd.read_csv(run_dir / f"chunk_{k:04d}.csv", dtype={"history": str}) for k in range(len(chunks))],
+        ignore_index=True,
+    )
+    want = keys(tasks)
+    return per[[k in want for k in zip(per.family, per.history, strict=True)]].reset_index(drop=True)
+
+
 def main(argv: list[str] | None = None) -> pd.DataFrame:
-    """Run all histories in parallel, write per-history and summary CSVs and the chart."""
+    """Run all histories (chunked, resumable), write per-history and summary CSVs and the chart."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--histories", type=int, default=1000, help="per family (model and bootstrap)")
-    ap.add_argument("--workers", type=int, default=os.cpu_count() or 4)
+    ap.add_argument("--workers", type=int, default=min(4, os.cpu_count() or 1), help="worker processes (max 4)")
+    ap.add_argument("--chunk-size", type=int, default=20, help="histories per saved chunk")
     args = ap.parse_args(argv)
+    workers = max(1, min(args.workers, 4))
     hw.OUT.mkdir(exist_ok=True)
     hw.load_prices()  # registers provenance in this process
-    tasks = [("stress", n) for n in STRESS_NAMES]
-    tasks += [(f, i) for i in range(args.histories) for f in ("model", "bootstrap")]
-    t0, parts = time.time(), []
-    with Pool(args.workers, initializer=_init_worker) as pool:
-        for k, part in enumerate(pool.imap_unordered(_task, tasks, chunksize=4)):
-            parts.append(part)
-            if (k + 1) % 50 == 0 or k + 1 == len(tasks):
-                print(f"  {k + 1}/{len(tasks)} histories done, {time.time() - t0:.0f}s", flush=True)
-    per = pd.concat(parts, ignore_index=True)
+    per = run_chunked(args.histories, workers, args.chunk_size)
     summary = summarise(per)
     write_csv(per, hw.OUT / "robustness_histories.csv", index=False)
     write_csv(summary, hw.OUT / "robustness_table.csv", index=False)
