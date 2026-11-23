@@ -68,4 +68,4 @@ Model forecast of the all-variable bill (as of 30 Jun of the year before) vs rea
   Coverage: 2 of 5 years outside the 5-95% range (a calibrated model: ~10%).
 
 HEADLINE: in 2022 an unhedged Limburg food processor (hypothetical) paid EUR 2.67m; fixing in 6 monthly tranches it would have paid EUR 1.31m (saving EUR 1.36m, 51%). HedgeWise optimiser (risk aversion 0.5): EUR 1.89m.
-Charts: /home/claude/hw/output/pitch_2022.png, pitch_cycle.png, backtest_all_years.png, backtest_calibration.png
+Charts: /Users/brunokardas/hedgewise/output/pitch_2022.png, pitch_cycle.png, backtest_all_years.png, backtest_calibration.png

@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
+import company_input as ci
 import hedgewise_model as hw
 
 st.set_page_config(page_title="HedgeWise", page_icon="⚡", layout="wide")
@@ -39,17 +40,58 @@ st.caption("How bad can next year's energy bill get, and how much should you fix
 with st.sidebar:
     st.header("Your company")
     name = st.text_input("Name", "Limburg food processor")
-    up = st.file_uploader("Upload monthly bills (CSV: month, gas_m3, power_kwh)", type="csv")
-    if up is not None:
-        company = hw.Company.from_csv(up, name=name)
-        st.success(f"{sum(company.gas_m3):,.0f} m3 gas, {sum(company.power_kwh)/1e3:,.0f} MWh power per year")
+    source = st.radio("Consumption data", ["Yearly totals + sector", "Upload bills (CSV / Excel)"],
+                      help="Upload 12-24 months of bills or a supplier-portal export, or just enter yearly totals.")
+    sector = st.selectbox("Sector (seasonal profile)", ci.SECTORS,
+                          help="Used to spread yearly totals over the months and to fill 1-3 missing months. "
+                               "The profiles are assumptions.")
+    company, notes = None, []
+    if source.startswith("Upload"):
+        up = st.file_uploader("Monthly bills or portal export", type=["csv", "txt", "xlsx", "xls"])
+        if up is not None:
+            try:
+                table = ci.read_table(up)
+            except Exception as e:  # noqa: BLE001
+                st.error(f"Could not read this file: {e}")
+                st.stop()
+            guess = ci.detect_columns(table)
+            cols = list(table.columns)
+            none = "(none)"
+            st.caption("Check the columns HedgeWise found:")
+            dcol = st.selectbox("Month / date column", cols, index=cols.index(guess["date"]) if guess["date"] else 0)
+            gcol = st.selectbox("Gas column", [none] + cols,
+                                index=([none] + cols).index(guess["gas"]) if guess["gas"] else 0)
+            gunit = st.selectbox("Gas unit", ci.GAS_UNITS, index=ci.GAS_UNITS.index(guess["gas_unit"]))
+            pcol = st.selectbox("Power column", [none] + cols,
+                                index=([none] + cols).index(guess["power"]) if guess["power"] else 0)
+            punit = st.selectbox("Power unit", ci.POWER_UNITS, index=ci.POWER_UNITS.index(guess["power_unit"]))
+            mapping = {"date": dcol, "gas": None if gcol == none else gcol, "power": None if pcol == none else pcol,
+                       "gas_unit": gunit, "power_unit": punit}
+            try:
+                res = ci.company_from_frame(table, mapping, name, sector)
+                company, notes = res.company, res.warnings
+            except ValueError as e:
+                st.error(str(e))
+                st.stop()
+            with st.expander("Preview of the file"):
+                st.dataframe(table.head(15), width="stretch")
+        else:
+            st.info("Upload a file, or switch to yearly totals.")
+            st.stop()
     else:
-        gas = st.number_input("Gas per year (m3)", 0, 50_000_000, 1_200_000, step=50_000)
-        power = st.number_input("Electricity per year (MWh)", 0, 500_000, 5_000, step=250)
-        base = hw.Company()
-        g_share = np.array(base.gas_m3) / sum(base.gas_m3)
-        p_share = np.array(base.power_kwh) / sum(base.power_kwh)
-        company = hw.Company(name=name, gas_m3=tuple(gas * g_share), power_kwh=tuple(power * 1000 * p_share))
+        gas = st.number_input("Gas per year", 0.0, 1e9, 1_200_000.0, step=50_000.0, format="%.0f")
+        gunit = st.selectbox("Gas unit", ci.GAS_UNITS, index=0)
+        power = st.number_input("Electricity per year", 0.0, 1e9, 5_000.0, step=250.0, format="%.0f")
+        punit = st.selectbox("Electricity unit", ci.POWER_UNITS, index=1)
+        try:
+            res = ci.from_yearly(gas, gunit, power, punit, sector, name)
+        except ValueError as e:
+            st.error(str(e))
+            st.stop()
+        company, notes = res.company, res.warnings
+    st.success(f"{sum(company.gas_m3):,.0f} m³ gas · {sum(company.power_kwh)/1e3:,.0f} MWh power per year")
+    for n_ in notes:
+        st.warning(n_)
     company.solar_kwp = st.slider("Rooftop solar (kWp)", 0, 5000, 0, step=100,
                                   help=f"~{hw.SOLAR_YIELD_KWH_PER_KWP} kWh per kWp per year, all self-consumed")
 

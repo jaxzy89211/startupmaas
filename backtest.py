@@ -33,6 +33,7 @@ import time
 import numpy as np
 import pandas as pd
 
+import company_input
 import hedgewise_model as hw
 
 DECISION_MONTHS = [6, 7, 8, 9, 10, 11]   # as-of = last day of these months in year Y-1
@@ -281,7 +282,7 @@ def main(argv=None):
     ap.add_argument("--paths", type=int, default=4000)
     ap.add_argument("--seed", type=int, default=42)
     ap.add_argument("--typical-month", type=int, default=10, help="month of the once-a-year renewal (1-12)")
-    ap.add_argument("--company", help="CSV with month, gas_m3, power_kwh")
+    company_input.add_cli_args(ap)
     ap.add_argument("--pitch-year", type=int, default=2022)
     ap.add_argument("--allow-timing", action="store_true", help="HedgeWise may fix everything at once")
     args = ap.parse_args(argv)
@@ -290,7 +291,7 @@ def main(argv=None):
 
     hw.OUT.mkdir(exist_ok=True)
     df = hw.load_prices()
-    company = hw.Company.from_csv(args.company) if args.company else hw.Company()
+    company = company_input.company_from_args(args)
     print(f"Company: {company.name} | gas {sum(company.gas_m3):,.0f} m3/yr "
           f"({company.gas_mwh.sum():,.0f} MWh), power {company.power_mwh.sum():,.0f} MWh/yr\n")
     rows, infos = {}, {}

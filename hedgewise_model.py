@@ -716,7 +716,8 @@ def main(argv=None):
     ap.add_argument("--risk-aversion", type=float, default=0.5, help="0 = only expected cost, 1 = only bad case")
     ap.add_argument("--paths", type=int, default=10_000)
     ap.add_argument("--seed", type=int, default=42)
-    ap.add_argument("--company", help="CSV with month, gas_m3, power_kwh")
+    import company_input
+    company_input.add_cli_args(ap)
     ap.add_argument("--solar-kwp", type=float, default=0.0)
     ap.add_argument("--demo", action="store_true", help="run on synthetic data")
     ap.add_argument("--show", action="store_true", help="open the chart window")
@@ -727,7 +728,7 @@ def main(argv=None):
 
     OUT.mkdir(exist_ok=True)
     df = demo_prices() if args.demo else load_prices()
-    company = Company.from_csv(args.company) if args.company else Company()
+    company = company_input.company_from_args(args)
     company.solar_kwp = args.solar_kwp
     as_of = args.as_of or (str(df.index.max().date()) if not args.demo else "2021-06-30")
     m = fit(df, as_of)
