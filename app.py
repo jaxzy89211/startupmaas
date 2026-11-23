@@ -9,9 +9,9 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 
-import company_input as ci
-import hedgewise_model as hw
-import report
+import hedgewise as hw
+from hedgewise import company_input as ci
+from hedgewise import report
 
 st.set_page_config(page_title="HedgeWise", page_icon="⚡", layout="wide")
 
