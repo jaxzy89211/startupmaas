@@ -137,3 +137,46 @@ validation:                       # out-of-sample test of the price model (pytho
 app:
   scenario_choices: [2000, 5000, 10000]
   default_scenarios: 5000
+
+green:                            # green investments as a hedge (hedgewise/green.py)
+  hourly_shape:
+    lookback_months: 36           # hourly price shapes from the last 36 complete months of data/power_nl_hourly.csv
+                                  # (post-2022 market with today's solar build-out; 15-min data averaged per hour)
+  load_profile: flat              # ASSUMPTION: power use spread evenly over the 24 hours of every day (a 24/7
+                                  # food processor). "daytime" = 70% of the volume between 07:00 and 19:00 local time
+  daytime_share: 0.70             # ASSUMPTION, used only with load_profile: daytime
+  solar:
+    capex_eur_per_kwp: 650        # ASSUMPTION: Dutch commercial rooftop PV 2025-26, turnkey, excl. SDE++ subsidy
+                                  # (order of magnitude of quotes for 0.5-2 MWp roofs; replace with a real quote)
+    opex_pct_of_capex: 1.5        # ASSUMPTION: maintenance + insurance, % of capex per year
+    lifetime_years: 25            # ASSUMPTION: typical module warranty period
+    export_value_share: 0.80      # exported power earns 80% of the day-ahead price (prompt spec; ASSUMPTION for the
+                                  # supplier's feed-in terms: imbalance and profile cost deducted)
+    sun_hours_cet:                # ASSUMPTION: production window per month in local clock time (sunrise+1h to
+                                  # sunset-1h, rounded, ~51 N), with a sine-shaped day profile peaking at solar noon
+      - [9, 16]
+      - [8, 17]
+      - [8, 18]
+      - [8, 20]
+      - [7, 21]
+      - [6, 21]
+      - [7, 21]
+      - [7, 20]
+      - [8, 19]
+      - [9, 18]
+      - [8, 16]
+      - [9, 16]
+  battery:
+    capex_eur_per_kwh: 350        # ASSUMPTION: commercial lithium-ion (LFP) incl. inverter and installation, 2025-26
+    opex_pct_of_capex: 1.0        # ASSUMPTION: % of capex per year
+    lifetime_years: 15            # ASSUMPTION: ~5,000 cycles at one cycle a day
+    round_trip_efficiency: 0.88   # prompt spec (typical for LFP systems)
+    cycles_per_day: 1             # simple daily strategy: charge in the cheapest hours, discharge in the dearest
+    peak_tariff_eur_per_kw_year: 40   # ASSUMPTION: grid capacity charge (kW-max) per kW per year, large-business
+                                      # tariff order of magnitude; network cost, outside the commodity bill
+    peak_shaving_share: 0.5       # ASSUMPTION: share of battery power that reliably cuts the monthly peak
+  ppa:
+    price_eur_mwh: null           # null = today's fixed power price (no discount: a PPA is then exactly a long
+                                  # fixed-price hedge). Enter a real quote to compare.
+    shape: baseload               # ASSUMPTION: the PPA volume follows the company's load profile (no shape risk)
+  annuity_rate: 0.05              # ASSUMPTION: cost of capital used to turn capex into a yearly cost

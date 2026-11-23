@@ -97,3 +97,6 @@ MAX_MISSING_MONTHS = _C["consumption_input"]["max_missing_months"]
 # backtest and app
 BACKTEST = _C["backtest"]
 APP = _C["app"]
+
+# green investments (config.yaml: green)
+GREEN = _C["green"]
