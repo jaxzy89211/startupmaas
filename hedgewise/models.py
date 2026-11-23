@@ -357,6 +357,10 @@ def fit(df: pd.DataFrame, as_of: DateLike | None = None, variance: str | None = 
     shocks["power"] = pm.innov_std
     shocks = shocks.dropna().iloc[-POWER_FIT_DAYS:]
     corr = np.corrcoef(shocks.values.T) if len(shocks) > MIN_CORR_OBS else np.eye(len(drivers) + 1)
+    # A constant series (e.g. power stuck at the price floor in a degenerate synthetic history) has no defined
+    # correlation (NaN); treat it as uncorrelated instead of crashing. Real data never hits this branch.
+    corr = np.where(np.isfinite(corr), corr, 0.0)
+    np.fill_diagonal(corr, 1.0)
     corr = _nearest_pd(corr)
     last = {k: float(h[k].iloc[-1]) for k in drivers + ["power"]}
     return FittedModel(as_of, drivers, garch, pm, corr, last, h)

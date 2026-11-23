@@ -122,3 +122,16 @@ def test_chunked_run_saves_each_chunk_and_resumes(tmp_path, monkeypatch):
     calls.clear()
     small = rb.run_chunked(1, workers=1, chunk_size=2)  # a smaller run reuses the saved chunks, nothing reruns
     assert calls == [] and len(small) == 5
+
+
+def test_fit_survives_a_constant_power_series(state):
+    """Bootstrap history 227 drives power below the floor for years: power is constant after flooring, its
+    shocks have zero variance and the correlation is NaN. The fit must treat that as 'uncorrelated'."""
+    import hedgewise as hw
+
+    real = state["real"]
+    h = real.copy()
+    h.loc["2025-01-01":, "power"] = 0.1  # below the floor for ~2 years -> constant after flooring
+    m = hw.fit(h, "2026-10-31")
+    assert np.isfinite(m.corr).all() and np.linalg.eigvalsh(m.corr).min() > 0
+    np.linalg.cholesky(m.corr)
