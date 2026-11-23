@@ -1,0 +1,19 @@
+# EXAMPLE client (made up). One YAML file per client; real client files contain confidential data:
+# keep them in clients/private/ (git-ignored), never in the repository.
+name: "Bakkerij Voorbeeld (fictief)"
+language: nl                      # nl or en: language of the monthly update and the email draft
+email: "inkoop@voorbeeld.example" # where the draft would go (nothing is sent automatically)
+consumption:
+  file: data/company_example.csv  # monthly bills (any format company_input reads) ...
+  # yearly: {gas: 1200000, gas_unit: m3, power: 5000, power_unit: MWh}   # ... or yearly totals
+  sector: food processing         # seasonal profile for yearly totals / missing months
+risk_aversion: 0.5                # or: budget: auto (last 12 months + 20%) / a number in EUR
+plan:
+  delivery_year: 2027
+  target_share: 0.55              # agreed share of 2027 gas and power to fix (from the report)
+  tranche_months: ["2026-07", "2026-08", "2026-09", "2026-10", "2026-11", "2026-12"]   # equal monthly tranches
+  tranches:                       # what has actually been bought: date, share of the yearly volume, prices
+    - {date: "2026-07-31", share: 0.0917, gas_eur_mwh: 56.9, power_eur_mwh: 125.5}
+    - {date: "2026-08-31", share: 0.0917, gas_eur_mwh: 65.2, power_eur_mwh: 140.9}
+    - {date: "2026-09-30", share: 0.0917, gas_eur_mwh: 79.2, power_eur_mwh: 157.2}
+    # October not bought yet -> the update flags it as overdue

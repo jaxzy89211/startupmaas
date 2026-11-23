@@ -230,3 +230,9 @@ extract:                          # reading invoices and contracts (extract.py).
   ai_max_tokens: 16000
   spike_factor: 3.0               # flag a month that is more than 3x the median month
   price_range_eur_mwh: [1, 1000]  # flag prices outside this range (after unit conversion)
+
+monitor:                          # monthly update (monitor.py, MONITORING.md); a person checks and sends it
+  n_paths: 5000                   # scenarios per client per month
+  bad_case_change: 0.15           # flag the bad case moving more than 15% since last month
+  price_change: 0.20              # flag a fixed price moving more than 20% since last month
+  overdue_tolerance: 0.01         # a planned tranche counts as overdue if more than 1 point is still missing
