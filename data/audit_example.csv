@@ -1,0 +1,14 @@
+year,commodity,share,price,unit,fixed_on
+2021,gas,100%,"1,40",ct/kWh,15-10-2020
+2021,power,100%,"4,1",ct/kWh,15-10-2020
+2022,gas,70%,0.58,EUR/m3,2021-09-20
+2022,gas,30%,variable,,
+2022,power,70%,12.0,ct/kWh,2021-09-20
+2022,power,30%,variable,,
+2023,gas,50%,123,EUR/MWh,2022-03-10
+2023,gas,30%,238,EUR/MWh,2022-08-25
+2023,power,60%,182,EUR/MWh,2022-06-15
+2024,gas,0%,variable,,
+2024,power,0%,variable,,
+2025,gas,60%,39.5,EUR/MWh,2024-10-01
+2025,power,60%,8.8,ct/kWh,2024-10-01

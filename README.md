@@ -11,6 +11,8 @@ python download_data.py            # refresh prices (about 5 min, rate-limited A
 python hedgewise_model.py          # today's view for next calendar year
 python backtest.py                 # strict 2021-2025 backtest + pitch chart
 python report.py --lang nl         # one-page PDF risk report for a CFO (EN or NL)
+python audit.py data/audit_example.csv   # procurement audit: your past contracts vs the strategies (~30 s)
+python report.py --audit data/audit_example.csv   # ... adds the audit as page 2 of the PDF
 python validation.py               # out-of-sample model validation (~1-2 min) -> METHODOLOGY.md
 python robustness.py --histories 200   # synthetic 8-year futures (~25 min on 4 cores; resumable, see below)
 python download_data.py --extended && python backtest.py --market DE-LU --years 2020 2021 2022 2023 2024 2025
@@ -43,6 +45,7 @@ below works as before. When imported (`import backtest`, `import hedgewise_model
 | `hedgewise/company_input.py` | Real bills: any CSV/Excel export, Dutch formats, yearly totals + sector |
 | `hedgewise/forwards.py` | Real forward prices from `data/forwards.csv` (if present) |
 | `hedgewise/validation.py` | Out-of-sample validation: monthly forecasts from June 2020, coverage / Kupiec / Christoffersen / CRPS / pinball for 5 variants, pre-registered selection rule |
+| `hedgewise/audit.py` | Procurement audit ("what would HedgeWise have saved you?"): past contracts per delivery year (share, price in EUR/MWh, ct/kWh, EUR/kWh, EUR/GJ or EUR/m³, optional date fixed; partial years allowed) vs all variable, fix 100% in October, 60% tranches, the 2-year ladder and the HedgeWise ladder, on real prices with the backtest's rules. Template: `data/audit_example.csv` (made-up company). App tab "Your past contracts" (EN/NL), optional PDF page 2 |
 | `hedgewise/robustness.py` | Strategies on synthetic 8-year futures (model, block bootstrap, 3 named stress paths). Runs in chunks of 20 histories, each saved to `output/robustness_chunks/` as soon as it finishes (git-ignored); rerunning the same command resumes, and at most 4 worker processes are used |
 | `hedgewise/provenance.py` | Writes config hash, data hashes and data date range into every output |
 | `hedgewise/settings.py`, `config.py`, `naming.py`, `cli.py`, `_types.py` | Settings from config, config loader, output names, model CLI, type aliases |

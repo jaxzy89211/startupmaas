@@ -24,7 +24,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
 from reportlab.pdfgen.canvas import Canvas
-from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 import hedgewise as hw
 from hedgewise import provenance
@@ -99,6 +99,16 @@ TEXT = {
         "stress_h": "What if 2022 happens again?",
         "stress_note": "Historical stress scenarios, not forecasts. Left: 2022 monthly prices as they were. Right: "
         "today's fixed price × (2022 avg ÷ 2021 avg), 2022 monthly pattern. Fixed share at today's price.",
+        "audit_h": "Your past contracts vs the strategies (realised prices)",
+        "audit_intro": "What you actually paid for gas and power (commodity cost only), next to what the same "
+        "consumption would have cost with each strategy, using only the real historical prices. Your entries: "
+        "{n} contract lines, years {span}.",
+        "audit_total": "Total",
+        "audit_worst": "Worst year",
+        "audit_note": "Same rules and real prices as the HedgeWise backtest; the strategies are not tuned to your "
+        "data. Where you did better than a strategy, the table shows it. The HedgeWise ladder was designed after "
+        "seeing 2021-2025, so its numbers are not independent evidence. Fixed shares cover the same share of every "
+        "month; the rest is priced at the realised monthly average (day-ahead power, TTF gas).",
         "footer": "<b>HedgeWise</b> · Assumptions: commodity cost only (no network tariffs, energy tax or supplier "
         "margin); {fixed}; volumes are "
         "taken as known. Scenarios come from a statistical model of past prices and can miss events "
@@ -132,6 +142,16 @@ TEXT = {
         "stress_h": "Wat als 2022 zich herhaalt?",
         "stress_note": "Historische stressscenario's, geen voorspellingen. Links: maandprijzen 2022 zoals ze waren. "
         "Rechts: vaste prijs nu × (gem. 2022 ÷ gem. 2021), maandpatroon 2022. Vast deel tegen de prijs van nu.",
+        "audit_h": "Uw contracten vs de strategieën (gerealiseerde prijzen)",
+        "audit_intro": "Wat u echt betaalde voor gas en stroom (alleen de energie zelf), naast wat hetzelfde verbruik "
+        "had gekost met elke strategie, met alleen de echte historische prijzen. Uw invoer: {n} contractregels, "
+        "jaren {span}.",
+        "audit_total": "Totaal",
+        "audit_worst": "Duurste jaar",
+        "audit_note": "Zelfde regels en echte prijzen als de HedgeWise-backtest; de strategieën zijn niet afgestemd "
+        "op uw data. Waar u het beter deed dan een strategie, staat dat in de tabel. De HedgeWise-ladder is "
+        "ontworpen na het zien van 2021-2025; die cijfers zijn dus geen onafhankelijk bewijs. Een vast aandeel geldt "
+        "voor elke maand; de rest tegen het gerealiseerde maandgemiddelde (day-ahead stroom, TTF-gas).",
         "footer": "<b>HedgeWise</b> · Aannames: alleen de kosten van de energie zelf (geen netbeheerkosten, "
         "energiebelasting of leveranciersmarge); {fixed}; het verbruik wordt als bekend aangenomen. "
         "De scenario's komen uit een "
@@ -211,10 +231,16 @@ def tradeoff_per_10pct(a: hw.Analysis) -> tuple[float, float]:
 # The report
 # --------------------------------------------------------------------------------------------
 def make_report(
-    a: hw.Analysis, path: PathOrBuffer, lang: str = "en", stress: dict | None = None, today: pd.Timestamp | None = None
+    a: hw.Analysis,
+    path: PathOrBuffer,
+    lang: str = "en",
+    stress: dict | None = None,
+    today: pd.Timestamp | None = None,
+    audit: object | None = None,
 ) -> None:
     """Write the one-page PDF to `path` (file path or binary buffer).
-    `stress` = output of hw.stress_test(a) (optional, adds one line)."""
+    `stress` = output of hw.stress_test(a) (optional, adds the stress chart); `audit` = an audit.AuditResult
+    (optional, adds a second page with the past-contracts comparison)."""
     if lang not in TEXT:
         raise ValueError(f"lang must be one of {list(TEXT)}")
     T = TEXT[lang]
@@ -357,6 +383,9 @@ def make_report(
         story.append(Image(sbuf, width=W, height=W * 2.45 / 8.2))
         story.append(Paragraph(T["stress_note"], ss["small"]))
 
+    if audit is not None:
+        story += _audit_page(audit, lang, T, ss, W)
+
     def _page(canv: Canvas, doc: SimpleDocTemplate) -> None:
         canv.saveState()
         canv.setFillColor(BRAND)
@@ -391,8 +420,51 @@ def make_report(
         author="HedgeWise",
     )
     doc.build(story, onFirstPage=_page, onLaterPages=_page)
-    if doc.page != 1:
-        raise RuntimeError(f"Report ran over one page ({doc.page} pages); shorten the text.")
+    pages = 1 if audit is None else 2
+    if doc.page != pages:
+        raise RuntimeError(f"Report has {doc.page} pages instead of {pages}; shorten the text.")
+
+
+def _audit_page(r: object, lang: str, T: dict, ss: dict, W: float) -> list:
+    """Page 2: the procurement audit (table with totals and worst year, the summary sentence, the chart)."""
+    from . import audit as au
+
+    t = r.table
+    span = f"{r.years[0]}-{r.years[-1]}" if len(r.years) > 1 else str(r.years[0])
+    out = [PageBreak(), Paragraph(T["audit_h"], ss["h"])]
+    out.append(Paragraph(T["audit_intro"].format(n=len(r.contracts), span=span), ss["body"]))
+    out.append(Spacer(1, 5))
+    hdr = [""] + [au.label(c, lang) for c in t.columns]
+    rows = [[str(y)] + [_num(v / 1e3, lang) for v in t.loc[y]] for y in t.index]
+    rows.append([T["audit_total"]] + [_num(v / 1e3, lang) for v in t.sum()])
+    rows.append([T["audit_worst"]] + [_num(v / 1e3, lang) for v in t.max()])
+    cell = ParagraphStyle("cell", fontName=FONT, fontSize=7, leading=8.5, textColor=INK)
+    data = [[Paragraph(_esc(h), cell) for h in hdr]] + rows
+    cw = [W * 0.1] + [W * 0.9 / len(t.columns)] * len(t.columns)
+    tb = Table(data, colWidths=cw)
+    tb.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, -1), FONT),
+                ("FONTSIZE", (0, 1), (-1, -1), 8.5),
+                ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
+                ("VALIGN", (0, 0), (-1, 0), "BOTTOM"),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f3f4f6")),
+                ("BACKGROUND", (1, 1), (1, -1), SOFT),  # the company's own column
+                ("FONTNAME", (0, -2), (-1, -1), FONT_BOLD),
+                ("LINEABOVE", (0, -2), (-1, -2), 0.6, colors.HexColor("#9ca3af")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]
+        )
+    )
+    out += [Paragraph("€ k" if lang == "en" else "€ duizend", ss["small"]), tb, Spacer(1, 6)]
+    out.append(Paragraph(_esc(au.sentence(r, lang)), ss["rec"]))
+    buf = io.BytesIO()
+    au.plot_audit(r, buf, lang)
+    buf.seek(0)
+    out += [Spacer(1, 6), Image(buf, width=W, height=W * 4.6 / 11.5), Paragraph(T["audit_note"], ss["small"])]
+    return out
 
 
 def _esc(s: str) -> str:
@@ -413,6 +485,7 @@ def main(argv: list[str] | None = None) -> Path:
     ap.add_argument("--paths", type=int, default=DEFAULT_PATHS)
     ap.add_argument("--seed", type=int, default=DEFAULT_SEED)
     ap.add_argument("--solar-kwp", type=float, default=0.0)
+    ap.add_argument("--audit", help="past contracts (CSV/Excel, see data/audit_example.csv): adds page 2")
     ap.add_argument("--out", help="output PDF path")
     args = ap.parse_args(argv)
     company = company_input.company_from_args(args)
@@ -423,6 +496,11 @@ def main(argv: list[str] | None = None) -> Path:
     stress = hw.stress_test(a, df) if hasattr(hw, "stress_test") else None
     out = Path(args.out) if args.out else report_path(company.name, m.as_of)
     out.parent.mkdir(exist_ok=True)
-    make_report(a, str(out), args.lang, stress)
+    audit = None
+    if args.audit:
+        from . import audit as au
+
+        audit = au.run_audit(au.read_contracts(args.audit), company, df)
+    make_report(a, str(out), args.lang, stress, audit=audit)
     print(f"Report written to {out}")
     return out

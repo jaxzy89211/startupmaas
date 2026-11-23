@@ -166,6 +166,48 @@ available at the time. Outside the 2021–22 crisis, our 90% bands held 90–92%
 crisis, no statistical model could see it coming: ours held 36–40%. That's why HedgeWise always shows a '2022
 happens again' stress test next to the model."
 
+## Procurement audit: "what would HedgeWise have saved you?" (new in v0.7)
+
+`python audit.py contracts.csv` (or the app tab "Your past contracts", or `report.py --audit` for a PDF page 2). The
+company enters what it actually bought per delivery year: share fixed, price and unit, and optionally the date it
+fixed. Its actual commodity cost per year is
+
+    cost = Σ share_k × price_k × yearly volume  +  (1 − Σ share_k) × Σ_months volume_m × realised monthly average price
+
+the same convention as the backtest. It is shown next to all variable, fix 100% in October, 60% in monthly tranches,
+the 2-year ladder and the HedgeWise ladder, run exactly as in `backtest.py` (real prices only, same seed and scenario
+count; for the default company the strategy columns equal the backtest table to the euro). Years can be partial;
+ct/kWh, EUR/kWh, EUR/GJ and EUR/m³ are converted to EUR/MWh. Where a fixing date is given, the market proxy on that
+day is printed next to the contract price, as a plausibility check.
+
+**Example** (`data/audit_example.csv`: a made-up company with the default food-processor profile, buying close to the
+market proxy on each fixing date: 3–6% above it), €k:
+
+| Year | Its contracts | All variable | Fix 100% Oct | 60% tranches | 2-year ladder | HedgeWise ladder |
+|---|---|---|---|---|---|---|
+| 2021 | 369 | 1,086 | 346 | 611 | 480 | 729 |
+| 2022 | 1,708 | 2,670 | 1,459 | 1,855 | 1,177 | 1,584 |
+| 2023 | 2,397 | 986 | 4,312 | 2,472 | 2,107 | 1,612 |
+| 2024 | 793 | 793 | 996 | 890 | 1,925 | 1,894 |
+| 2025 | 889 | 867 | 871 | 884 | 913 | 893 |
+| **Total** | **6,156** | 6,403 | 7,985 | 6,713 | 6,602 | 6,712 |
+| **Worst year** | 2,397 | 2,670 | 4,312 | 2,472 | 2,107 | 1,894 |
+
+"You paid €6.16m over 2021-2025; the 2-year ladder would have cost €6.60m. Your worst year (2023, €2.40m) would have
+been €0.29m lower with the 2-year ladder. In total you did better than: All variable, Fix 100% in October, 60% in
+monthly tranches, 2-year ladder (40%+40%), HedgeWise ladder."
+
+This example company beats every strategy on total, mainly by fixing 100% for 2021 in October 2020, just before the
+crisis. That's the point of the rule "never hide a result where the company did better": the audit says so in its
+first sentence, and the app, CLI and PDF show the full table. Real interviewees will have their own numbers; the
+example is made up and proves nothing about real companies.
+
+**Checking it by hand** (`tests/test_audit.py`): a made-up "Testbakkerij" using exactly 1,000 MWh gas and 500 MWh
+power every month. 2022 gas: 50% at 10 ct/kWh (= €100/MWh) → 0.5 × 100 × 12,000 + 0.5 × Σ 1,000 × monthly TTF
+average. 2024 gas: 100% at €0.50/m³ (= 0.50 / 0.009769 = €51.18/MWh) → 51.18 × 12,000 = €614k. The test recomputes
+the realised monthly averages from the daily prices and checks every column (all variable, fix 100% in October from
+the 30-day average × 1.05, 60% tranches from the 6 month-end prices) to 1e-9.
+
 ## Robustness (new in v0.7)
 
 ### Synthetic histories: 8 future delivery years (`python robustness.py`)
