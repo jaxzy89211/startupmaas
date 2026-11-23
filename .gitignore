@@ -20,3 +20,6 @@ data/private/
 clients/private/
 output/history/
 output/monitor/
+# only the made-up example client is committed
+clients/*.yaml
+!clients/example.yaml

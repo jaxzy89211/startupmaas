@@ -1,0 +1,33 @@
+2003 histories in 101 chunks of 20; 101 chunks already saved in output/robustness_chunks/cfgb360148627fd_data8181ab654204_paths300_chunk20; 4 worker processes
+
+EUR k; HedgeWise strategies use 300 scenarios per decision
+   family                               strategy    n  median_total  total_p05  total_p95  median_worst_year  worst_year_p05  p95_worst_year  p95_max_jump pct_beats_variable
+   stress                           All variable    3         16133      13702      50278               7042            5544            7938          1998                 0%
+   stress                        Fix 100% in Oct    3         20621      19043      50202               9280            8590            9787          6024                 0%
+   stress                  Fix 60% at once (Jul)    3         19071      14751      49328               6764            4219            7874          2218                67%
+   stress                     Tranches 6x (100%)    3         19729      17483      49487               8615            7268            9014          5420                 0%
+   stress                      Tranches 6x (60%)    3         18291      15971      49803               5783            5140            8013          2188                 0%
+   stress               Layered 2 years (40+40%)    3         19195      16995      47703               4976            4472            7758          1678                 0%
+   stress           HedgeWise policy (gamma 0.5)    3         17531      16559      49554               5743            5327            7693          1684                33%
+   stress HedgeWise ladder (40% + capped top-up)    3         18351      16383      47929               4485            3723            8032          1817                 0%
+   stress          HedgeWise (risk aversion 0.5)    3         17531      16559      49767               5743            5327            7686          1684                33%
+    model                           All variable 1000          5919       1185      43847               1705             400           10946          4769                 0%
+    model                        Fix 100% in Oct 1000          7393       1890      44199               2221             745           11582          6492                10%
+    model                  Fix 60% at once (Jul) 1000          7104       1980      44483               1942             757           10742          4680                18%
+    model                     Tranches 6x (100%) 1000          7445       2036      44290               2141             791           10963          6117                 7%
+    model                      Tranches 6x (60%) 1000          6848       1711      44509               1868             652           10713          4352                17%
+    model               Layered 2 years (40+40%) 1000          7638       2497      42527               1785            1039            9586          3347                18%
+    model           HedgeWise policy (gamma 0.5) 1000          6766       1725      44256               1824             635           10839          4096                20%
+    model HedgeWise ladder (40% + capped top-up) 1000          7182       2264      42884               1642             917            9568          2993                22%
+    model          HedgeWise (risk aversion 0.5) 1000          6768       1725      44196               1824             635           10839          4109                20%
+bootstrap                           All variable  999        194035       6444  309442610              72665            1943       211330946     167098087                 0%
+bootstrap                        Fix 100% in Oct  999        157231       7184   99969160              67474            2240        65786790      58618974                47%
+bootstrap                  Fix 60% at once (Jul)  999        179006       7705  190066960              62664            2002       117825673      96703603                63%
+bootstrap                     Tranches 6x (100%)  999        160654       7594  102796300              63224            2301        68508745      64932652                44%
+bootstrap                      Tranches 6x (60%)  999        179702       7426  262690681              62623            2120       153287263     114874356                60%
+bootstrap               Layered 2 years (40+40%)  999        155452       7900  164882165              50847            1793       108127209      60610369                72%
+bootstrap           HedgeWise policy (gamma 0.5)  999        170624       7108  131010583              61536            2170        91862519      82976139                51%
+bootstrap HedgeWise ladder (40% + capped top-up)  999        165858       7626  184900008              50793            1714       115487264      68216025                74%
+bootstrap          HedgeWise (risk aversion 0.5)  999        169744       7023  130406866              60667            2159        91043106      83024058                50%
+Histories that could not be run (left out of the summary): {'bootstrap': 1}
+Provenance: config 88320de3feda · data 8181ab654204 (2019-01-02..2026-11-23) · v0.7.0

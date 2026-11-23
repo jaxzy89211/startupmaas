@@ -1,0 +1,312 @@
+2003 histories in 101 chunks of 20; 0 chunks already saved in  150/403 histories done, 582s
+utput/robustness_chunks/cfgb360148627fd_data8181ab654204_paths300_chunk20; 4 worker processes
+  chunk 1/101 saved (1/101 this run, 131s, ~218 min left)
+  chunk 2/101 saved (2/101 this run, 200s, ~165 min left)
+  chunk 3/101 saved (3/101 this run, 272s, ~148 min left)
+  chunk 4/101 saved (4/101 this run, 363s, ~147 min left)
+  chunk 5/101 saved (5/101 this run, 444s, ~142 min left)
+  chunk 6/101 saved (6/101 this run, 528s, ~139 min left)
+  chunk 7/101 saved (7/101 this run, 624s, ~140 min left)
+  chunk 8/101 saved (8/101 this run, 710s, ~138 min left)
+  chunk 9/101 saved (9/101 this run, 808s, ~138 min left)
+  chunk 10/101 saved (10/101 this run, 888s, ~135 min left)
+  chunk 11/101 saved (11/101 this run, 964s, ~131 min left)
+  chunk 12/101 saved (12/101 this run, 1038s, ~128 min left)
+  chunk 13/101 saved (13/101 this run, 1108s, ~125 min left)
+  chunk 14/101 saved (14/101 this run, 1172s, ~121 min left)
+  chunk 15/101 saved (15/101 this run, 1241s, ~119 min left)
+  chunk 16/101 saved (16/101 this run, 1309s, ~116 min left)
+  chunk 17/101 saved (17/101 this run, 1370s, ~113 min left)
+  chunk 18/101 saved (18/101 this run, 1428s, ~110 min left)
+  chunk 19/101 saved (19/101 this run, 1486s, ~107 min left)
+  chunk 20/101 saved (20/101 this run, 1551s, ~105 min left)
+  chunk 21/101 saved (21/101 this run, 1631s, ~104 min left)
+  chunk 22/101 saved (22/101 this run, 1704s, ~102 min left)
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: divide by zero encountered in log
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: divide by zero encountered in divide
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: invalid value encountered in subtract
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:316: RuntimeWarning: divide by zero encountered in divide
+  pd.Series(e / sd, index=d.index[1:]),
+/Users/brunokardas/hedgewise/.venv/lib/python3.14/site-packages/numpy/lib/_function_base_impl.py:2896: RuntimeWarning: invalid value encountered in subtract
+  X -= avg[:, None]
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ~~~~^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/Users/brunokardas/hedgewise/hedgewise/robustness.py", line 201, in _task
+    met = history_metrics(run_history(df, _STATE["years"], _STATE["company"]))
+                          ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/brunokardas/hedgewise/hedgewise/robustness.py", line 160, in run_history
+    rows[y], info = bt.run_year(
+                    ~~~~~~~~~~~^
+        df,
+        ^^^
+    ...<7 lines>...
+        prev_ladder_target=prev,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/brunokardas/hedgewise/hedgewise/backtest.py", line 140, in run_year
+    sims = hw.simulate(m, ds + pd.DateOffset(years=1) - pd.Timedelta(days=1), n_paths, seed)
+  File "/Users/brunokardas/hedgewise/hedgewise/simulate.py", line 26, in simulate
+    L = np.linalg.cholesky(m.corr)
+  File "/Users/brunokardas/hedgewise/.venv/lib/python3.14/site-packages/numpy/linalg/_linalg.py", line 887, in cholesky
+    r = gufunc(a, signature=signature)
+  File "/Users/brunokardas/hedgewise/.venv/lib/python3.14/site-packages/numpy/linalg/_linalg.py", line 147, in _raise_linalgerror_nonposdef
+    raise LinAlgError("Matrix is not positive definite")
+numpy.linalg.LinAlgError: Matrix is not positive definite
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/brunokardas/hedgewise/robustness.py", line 16, in <module>
+    _impl.main()
+    ~~~~~~~~~~^^
+  File "/Users/brunokardas/hedgewise/hedgewise/robustness.py", line 379, in main
+    f"~{el / (j + 1) * (len(todo) - j - 1) / 60:.0f} min left)",
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/brunokardas/hedgewise/hedgewise/robustness.py", line 351, in run_chunked
+    return False
+    
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/pool.py", line 367, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/pool.py", line 774, in get
+    raise self._value
+numpy.linalg.LinAlgError: Matrix is not positive definite
+2003 histories in 101 chunks of 20; 22 chunks already saved in /Users/brunokardas/hedgewise/output/robustness_chunks/cfgb360148627fd_data8181ab654204_paths300_chunk20; 4 worker processes
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: divide by zero encountered in log
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: divide by zero encountered in divide
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: invalid value encountered in subtract
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:316: RuntimeWarning: divide by zero encountered in divide
+  pd.Series(e / sd, index=d.index[1:]),
+/Users/brunokardas/hedgewise/.venv/lib/python3.14/site-packages/numpy/lib/_function_base_impl.py:2896: RuntimeWarning: invalid value encountered in subtract
+  X -= avg[:, None]
+  chunk 23/101 saved (1/79 this run, 68s, ~88 min left)
+  chunk 24/101 saved (2/79 this run, 130s, ~83 min left)
+  chunk 25/101 saved (3/79 this run, 187s, ~79 min left)
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: divide by zero encountered in log
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: divide by zero encountered in divide
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: invalid value encountered in subtract
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:316: RuntimeWarning: divide by zero encountered in divide
+  pd.Series(e / sd, index=d.index[1:]),
+/Users/brunokardas/hedgewise/.venv/lib/python3.14/site-packages/numpy/lib/_function_base_impl.py:2896: RuntimeWarning: invalid value encountered in subtract
+  X -= avg[:, None]
+  chunk 26/101 saved (4/79 this run, 250s, ~78 min left)
+  chunk 27/101 saved (5/79 this run, 321s, ~79 min left)
+  chunk 28/101 saved (6/79 this run, 395s, ~80 min left)
+  chunk 29/101 saved (7/79 this run, 459s, ~79 min left)
+  chunk 30/101 saved (8/79 this run, 553s, ~82 min left)
+  chunk 31/101 saved (9/79 this run, 630s, ~82 min left)
+  chunk 32/101 saved (10/79 this run, 714s, ~82 min left)
+  chunk 33/101 saved (11/79 this run, 788s, ~81 min left)
+  chunk 34/101 saved (12/79 this run, 850s, ~79 min left)
+  chunk 35/101 saved (13/79 this run, 915s, ~77 min left)
+  chunk 36/101 saved (14/79 this run, 979s, ~76 min left)
+  chunk 37/101 saved (15/79 this run, 1041s, ~74 min left)
+  chunk 38/101 saved (16/79 this run, 1119s, ~73 min left)
+  chunk 39/101 saved (17/79 this run, 1195s, ~73 min left)
+  chunk 40/101 saved (18/79 this run, 1280s, ~72 min left)
+  chunk 41/101 saved (19/79 this run, 1358s, ~71 min left)
+  chunk 42/101 saved (20/79 this run, 1443s, ~71 min left)
+  chunk 43/101 saved (21/79 this run, 1540s, ~71 min left)
+  chunk 44/101 saved (22/79 this run, 1645s, ~71 min left)
+  chunk 45/101 saved (23/79 this run, 1751s, ~71 min left)
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: divide by zero encountered in log
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: divide by zero encountered in divide
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: invalid value encountered in subtract
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:316: RuntimeWarning: divide by zero encountered in divide
+  pd.Series(e / sd, index=d.index[1:]),
+/Users/brunokardas/hedgewise/.venv/lib/python3.14/site-packages/numpy/lib/_function_base_impl.py:2896: RuntimeWarning: invalid value encountered in subtract
+  X -= avg[:, None]
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: divide by zero encountered in log
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: divide by zero encountered in divide
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:88: RuntimeWarning: invalid value encountered in subtract
+  return c - 0.5 * np.log(s2) - (nu + 1) / 2 * np.log1p(z**2 / (s2 * (nu - 2)))
+/Users/brunokardas/hedgewise/hedgewise/models.py:316: RuntimeWarning: divide by zero encountered in divide
+  pd.Series(e / sd, index=d.index[1:]),
+/Users/brunokardas/hedgewise/.venv/lib/python3.14/site-packages/numpy/lib/_function_base_impl.py:2896: RuntimeWarning: invalid value encountered in subtract
+  X -= avg[:, None]
+  chunk 46/101 saved (24/79 this run, 1831s, ~70 min left)
+  chunk 47/101 saved (25/79 this run, 1896s, ~68 min left)
+  chunk 48/101 saved (26/79 this run, 1994s, ~68 min left)
+  chunk 49/101 saved (27/79 this run, 2108s, ~68 min left)
+  chunk 50/101 saved (28/79 this run, 2234s, ~68 min left)
+  chunk 51/101 saved (29/79 this run, 2324s, ~67 min left)
+  chunk 52/101 saved (30/79 this run, 2416s, ~66 min left)
+  chunk 53/101 saved (31/79 this run, 2515s, ~65 min left)
+  chunk 54/101 saved (32/79 this run, 2617s, ~64 min left)
+/Users/brunokardas/hedgewise/hedgewise/models.py:303: RuntimeWarning: invalid value encountered in scalar divide
+  phi = float(np.clip(np.dot(u[1:], u[:-1]) / np.dot(u[:-1], u[:-1]), 0, POWER_PHI_MAX))
+/Users/brunokardas/hedgewise/hedgewise/strategies.py:111: RuntimeWarning: Mean of empty slice
+  f"es{int(q * 100)}": float(cost[cost >= var].mean()),
+/Users/brunokardas/hedgewise/.venv/lib/python3.14/site-packages/numpy/_core/_methods.py:142: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+multiprocessing.pool.RemoteTraceback: 
+"""
+Traceback (most recent call last):
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/pool.py", line 125, in worker
+    result = (True, func(*args, **kwds))
+                    ~~~~^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/pool.py", line 48, in mapstar
+    return list(map(*args))
+  File "/Users/brunokardas/hedgewise/hedgewise/robustness.py", line 334, in _task_ref
+    return _task(task)
+  File "/Users/brunokardas/hedgewise/hedgewise/robustness.py", line 201, in _task
+    met = history_metrics(run_history(df, _STATE["years"], _STATE["company"]))
+                          ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/brunokardas/hedgewise/hedgewise/robustness.py", line 160, in run_history
+    rows[y], info = bt.run_year(
+                    ~~~~~~~~~~~^
+        df,
+        ^^^
+    ...<7 lines>...
+        prev_ladder_target=prev,
+        ^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "/Users/brunokardas/hedgewise/hedgewise/backtest.py", line 144, in run_year
+    a = hw.analyse(
+        m, company, ds, n_paths, seed, lam, max_tranches=n_left, sims=sims, allow_timing=allow_timing
+    )
+  File "/Users/brunokardas/hedgewise/hedgewise/strategies.py", line 261, in analyse
+    best = frontier.loc[frontier.objective.idxmin()]
+                        ~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Users/brunokardas/hedgewise/.venv/lib/python3.14/site-packages/pandas/core/series.py", line 2801, in idxmin
+    iloc = self.argmin(axis, skipna, *args, **kwargs)
+  File "/Users/brunokardas/hedgewise/.venv/lib/python3.14/site-packages/pandas/core/base.py", line 943, in argmin
+    result = nanops.nanargmin(  # type: ignore[assignment]
+        delegate, skipna=skipna
+    )
+  File "/Users/brunokardas/hedgewise/.venv/lib/python3.14/site-packages/pandas/core/nanops.py", line 1640, in nanargmin
+    result = _maybe_arg_null_out(result, axis, mask, skipna)  # type: ignore[assignment]
+  File "/Users/brunokardas/hedgewise/.venv/lib/python3.14/site-packages/pandas/core/nanops.py", line 1863, in _maybe_arg_null_out
+    raise ValueError("Encountered all NA values")
+ValueError: Encountered all NA values
+"""
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/Users/brunokardas/hedgewise/robustness.py", line 16, in <module>
+    _impl.main()
+    ~~~~~~~~~~^^
+  File "/Users/brunokardas/hedgewise/hedgewise/robustness.py", line 404, in main
+    per = run_chunked(args.histories, workers, args.chunk_size)
+  File "/Users/brunokardas/hedgewise/hedgewise/robustness.py", line 372, in run_chunked
+    part = pd.concat(mapper(_task_ref, chunks[k]), ignore_index=True)
+                     ~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "/Users/brunokardas/hedgewise/hedgewise/robustness.py", line 369, in <lambda>
+    mapper = lambda f, xs: pool.map(f, xs, chunksize=1)  # noqa: E731
+                           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/pool.py", line 367, in map
+    return self._map_async(func, iterable, mapstar, chunksize).get()
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^^
+  File "/Library/Frameworks/Python.framework/Versions/3.14/lib/python3.14/multiprocessing/pool.py", line 774, in get
+    raise self._value
+ValueError: Encountered all NA values
+2003 histories in 101 chunks of 20; 54 chunks already saved in output/robustness_chunks/cfgb360148627fd_data8181ab654204_paths300_chunk20; 4 worker processes
+/Users/brunokardas/hedgewise/hedgewise/models.py:303: RuntimeWarning: invalid value encountered in scalar divide
+  phi = float(np.clip(np.dot(u[1:], u[:-1]) / np.dot(u[:-1], u[:-1]), 0, POWER_PHI_MAX))
+/Users/brunokardas/hedgewise/hedgewise/strategies.py:111: RuntimeWarning: Mean of empty slice
+  f"es{int(q * 100)}": float(cost[cost >= var].mean()),
+/Users/brunokardas/hedgewise/.venv/lib/python3.14/site-packages/numpy/_core/_methods.py:142: RuntimeWarning: invalid value encountered in scalar divide
+  ret = ret.dtype.type(ret / rcount)
+  chunk 55/101 saved (1/47 this run, 67s, ~51 min left)
+  chunk 56/101 saved (2/47 this run, 131s, ~49 min left)
+  chunk 57/101 saved (3/47 this run, 204s, ~50 min left)
+  chunk 58/101 saved (4/47 this run, 273s, ~49 min left)
+  chunk 59/101 saved (5/47 this run, 343s, ~48 min left)
+  chunk 60/101 saved (6/47 this run, 406s, ~46 min left)
+  chunk 61/101 saved (7/47 this run, 467s, ~45 min left)
+  chunk 62/101 saved (8/47 this run, 527s, ~43 min left)
+  chunk 63/101 saved (9/47 this run, 587s, ~41 min left)
+  chunk 64/101 saved (10/47 this run, 648s, ~40 min left)
+  chunk 65/101 saved (11/47 this run, 706s, ~38 min left)
+  chunk 66/101 saved (12/47 this run, 764s, ~37 min left)
+  chunk 67/101 saved (13/47 this run, 822s, ~36 min left)
+  chunk 68/101 saved (14/47 this run, 885s, ~35 min left)
+  chunk 69/101 saved (15/47 this run, 952s, ~34 min left)
+  chunk 70/101 saved (16/47 this run, 1011s, ~33 min left)
+  chunk 71/101 saved (17/47 this run, 1066s, ~31 min left)
+  chunk 72/101 saved (18/47 this run, 1124s, ~30 min left)
+  chunk 73/101 saved (19/47 this run, 1186s, ~29 min left)
+  chunk 74/101 saved (20/47 this run, 1243s, ~28 min left)
+  chunk 75/101 saved (21/47 this run, 1310s, ~27 min left)
+  chunk 76/101 saved (22/47 this run, 1372s, ~26 min left)
+  chunk 77/101 saved (23/47 this run, 1440s, ~25 min left)
+  chunk 78/101 saved (24/47 this run, 1508s, ~24 min left)
+  chunk 79/101 saved (25/47 this run, 1594s, ~23 min left)
+  chunk 80/101 saved (26/47 this run, 1663s, ~22 min left)
+  chunk 81/101 saved (27/47 this run, 1732s, ~21 min left)
+  chunk 82/101 saved (28/47 this run, 1794s, ~20 min left)
+  chunk 83/101 saved (29/47 this run, 1857s, ~19 min left)
+  chunk 84/101 saved (30/47 this run, 1927s, ~18 min left)
+  chunk 85/101 saved (31/47 this run, 2005s, ~17 min left)
+  chunk 86/101 saved (32/47 this run, 2078s, ~16 min left)
+  chunk 87/101 saved (33/47 this run, 2162s, ~15 min left)
+  chunk 88/101 saved (34/47 this run, 2265s, ~14 min left)
+  chunk 89/101 saved (35/47 this run, 2334s, ~13 min left)
+  chunk 90/101 saved (36/47 this run, 2401s, ~12 min left)
+  chunk 91/101 saved (37/47 this run, 2469s, ~11 min left)
+  chunk 92/101 saved (38/47 this run, 2540s, ~10 min left)
+  chunk 93/101 saved (39/47 this run, 2602s, ~9 min left)
+  chunk 94/101 saved (40/47 this run, 2672s, ~8 min left)
+  chunk 95/101 saved (41/47 this run, 2760s, ~7 min left)
+  chunk 96/101 saved (42/47 this run, 2849s, ~6 min left)
+  chunk 97/101 saved (43/47 this run, 2918s, ~5 min left)
+  chunk 98/101 saved (44/47 this run, 2996s, ~3 min left)
+  chunk 99/101 saved (45/47 this run, 3071s, ~2 min left)
+  chunk 100/101 saved (46/47 this run, 3151s, ~1 min left)
+  chunk 101/101 saved (47/47 this run, 3162s, ~0 min left)
+
+EUR k; HedgeWise strategies use 300 scenarios per decision
+   family                               strategy    n  median_total  total_p05  total_p95  median_worst_year  worst_year_p05  p95_worst_year  p95_max_jump pct_beats_variable
+   stress                           All variable    3         16133      13702      50278               7042            5544            7938          1998                 0%
+   stress                        Fix 100% in Oct    3         20621      19043      50202               9280            8590            9787          6024                 0%
+   stress                  Fix 60% at once (Jul)    3         19071      14751      49328               6764            4219            7874          2218                67%
+   stress                     Tranches 6x (100%)    3         19729      17483      49487               8615            7268            9014          5420                 0%
+   stress                      Tranches 6x (60%)    3         18291      15971      49803               5783            5140            8013          2188                 0%
+   stress               Layered 2 years (40+40%)    3         19195      16995      47703               4976            4472            7758          1678                 0%
+   stress           HedgeWise policy (gamma 0.5)    3         17531      16559      49554               5743            5327            7693          1684                33%
+   stress HedgeWise ladder (40% + capped top-up)    3         18351      16383      47929               4485            3723            8032          1817                 0%
+   stress          HedgeWise (risk aversion 0.5)    3         17531      16559      49767               5743            5327            7686          1684                33%
+    model                           All variable 1000          5919       1185      43847               1705             400           10946          4769                 0%
+    model                        Fix 100% in Oct 1000          7393       1890      44199               2221             745           11582          6492                10%
+    model                  Fix 60% at once (Jul) 1000          7104       1980      44483               1942             757           10742          4680                18%
+    model                     Tranches 6x (100%) 1000          7445       2036      44290               2141             791           10963          6117                 7%
+    model                      Tranches 6x (60%) 1000          6848       1711      44509               1868             652           10713          4352                17%
+    model               Layered 2 years (40+40%) 1000          7638       2497      42527               1785            1039            9586          3347                18%
+    model           HedgeWise policy (gamma 0.5) 1000          6766       1725      44256               1824             635           10839          4096                20%
+    model HedgeWise ladder (40% + capped top-up) 1000          7182       2264      42884               1642             917            9568          2993                22%
+    model          HedgeWise (risk aversion 0.5) 1000          6768       1725      44196               1824             635           10839          4109                20%
+bootstrap                           All variable  999        194035       6444  309442610              72665            1943       211330946     167098087                 0%
+bootstrap                        Fix 100% in Oct  999        157231       7184   99969160              67474            2240        65786790      58618974                47%
+bootstrap                  Fix 60% at once (Jul)  999        179006       7705  190066960              62664            2002       117825673      96703603                63%
+bootstrap                     Tranches 6x (100%)  999        160654       7594  102796300              63224            2301        68508745      64932652                44%
+bootstrap                      Tranches 6x (60%)  999        179702       7426  262690681              62623            2120       153287263     114874356                60%
+bootstrap               Layered 2 years (40+40%)  999        155452       7900  164882165              50847            1793       108127209      60610369                72%
+bootstrap           HedgeWise policy (gamma 0.5)  999        170624       7108  131010583              61536            2170        91862519      82976139                51%
+bootstrap HedgeWise ladder (40% + capped top-up)  999        165858       7626  184900008              50793            1714       115487264      68216025                74%
+bootstrap          HedgeWise (risk aversion 0.5)  999        169744       7023  130406866              60667            2159        91043106      83024058                50%
+Histories that could not be run (left out of the summary): {'bootstrap': 1}
+Provenance: config 9cbfbda9d6dc · data 8181ab654204 (2019-01-02..2026-11-23) · v0.7.0
