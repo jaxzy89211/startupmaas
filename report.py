@@ -80,8 +80,6 @@ TEXT = {
         "tradeoff": "Each extra 10% fixed costs about <b>{a}</b> on average and removes about <b>{b}</b> "
                     "from the bad case.",
         "stress_h": "What if 2022 happens again?",
-        "stress_sc": "<b>{label}</b> (gas avg {gas}, power {power} per MWh): staying variable {var}; "
-                     "with our recommendation {hw}.",
         "stress_note": "Historical stress scenarios, not forecasts. Left: 2022 monthly prices as they were. Right: "
                        "today's fixed price × (2022 avg ÷ 2021 avg), 2022 monthly pattern. Fixed share at today's price.",
         "footer": "<b>HedgeWise</b> · Assumptions: commodity cost only (no network tariffs, energy tax or supplier "
@@ -114,8 +112,6 @@ TEXT = {
         "tradeoff": "Elke extra 10% vastzetten kost gemiddeld ongeveer <b>{a}</b> en haalt ongeveer <b>{b}</b> "
                     "van het slechte scenario af.",
         "stress_h": "Wat als 2022 zich herhaalt?",
-        "stress_sc": "<b>{label}</b> (gas gem. {gas}, stroom {power} per MWh): variabel blijven {var}; "
-                     "met ons advies {hw}.",
         "stress_note": "Historische stressscenario's, geen voorspellingen. Links: maandprijzen 2022 zoals ze waren. "
                        "Rechts: vaste prijs nu × (gem. 2022 ÷ gem. 2021), maandpatroon 2022. Vast deel tegen de prijs van nu.",
         "footer": "<b>HedgeWise</b> · Aannames: alleen de kosten van de energie zelf (geen netbeheerkosten, "
@@ -155,10 +151,6 @@ def money(x: float, lang: str) -> str:
     if lang == "en":
         return f"€{_num(x / 1e3, lang, 0)}k"
     return f"€\u00a0{_num(round(x, -3), lang, 0)}"
-
-
-def _eur0(x: float, lang: str) -> str:
-    return f"€{x:,.0f}" if lang == "en" else f"€\u00a0{_num(x, lang)}"
 
 
 def pct(x: float) -> str:
