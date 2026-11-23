@@ -1,4 +1,4 @@
-# HedgeWise model (v0.5)
+# HedgeWise model (v0.6)
 
 Energy price-risk model for mid-sized Dutch companies: **consumption in → worst-case bill and hedge recommendation out.**
 
@@ -11,6 +11,7 @@ python download_data.py            # refresh prices (about 5 min, rate-limited A
 python hedgewise_model.py          # today's view for next calendar year
 python backtest.py                 # strict 2021-2025 backtest + pitch chart
 python report.py --lang nl         # one-page PDF risk report for a CFO (EN or NL)
+python validation.py               # out-of-sample model validation (~1-2 min) -> METHODOLOGY.md
 streamlit run app.py               # live demo dashboard in the browser
 python -m pytest -q --cov          # tests + coverage (pip install -r requirements-dev.txt)
 ruff check . && ruff format --check .   # lint
@@ -39,6 +40,7 @@ below works as before. When imported (`import backtest`, `import hedgewise_model
 | `hedgewise/backtest.py` | Strict backtest (each decision re-fits on data up to that date only) |
 | `hedgewise/company_input.py` | Real bills: any CSV/Excel export, Dutch formats, yearly totals + sector |
 | `hedgewise/forwards.py` | Real forward prices from `data/forwards.csv` (if present) |
+| `hedgewise/validation.py` | Out-of-sample validation: monthly forecasts from June 2020, coverage / Kupiec / Christoffersen / CRPS / pinball for 5 variants, pre-registered selection rule |
 | `hedgewise/provenance.py` | Writes config hash, data hashes and data date range into every output |
 | `hedgewise/settings.py`, `config.py`, `naming.py`, `cli.py`, `_types.py` | Settings from config, config loader, output names, model CLI, type aliases |
 | `hedgewise_model.py`, `backtest.py`, `report.py`, `company_input.py`, `forwards.py` | Thin wrappers (commands unchanged) |
@@ -49,6 +51,7 @@ below works as before. When imported (`import backtest`, `import hedgewise_model
 | `.github/workflows/ci.yml` | Ruff (lint + format) and pytest on Python 3.11 and 3.12, on every push |
 | `data/company_example.csv` | Template for pilot data (month, gas_m3, power_kwh) |
 | `data/forwards_example.csv` | **Fake** forward prices, only for the tests. Never copy it to `data/forwards.csv` |
+| `METHODOLOGY.md` | How the model works, how it is validated, the results, and where every model fails |
 | `DEPLOY.md`, `.streamlit/config.toml` | Deployment steps, dashboard theme |
 
 ## Reproducibility and quality

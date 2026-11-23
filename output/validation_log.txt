@@ -1,0 +1,56 @@
+  1/76 origins done (last: 2020-06-30)
+  7/76 origins done (last: 2020-12-31)
+  13/76 origins done (last: 2021-06-30)
+  19/76 origins done (last: 2021-12-31)
+  25/76 origins done (last: 2022-06-30)
+  31/76 origins done (last: 2022-12-31)
+  37/76 origins done (last: 2023-06-30)
+  43/76 origins done (last: 2023-12-31)
+  49/76 origins done (last: 2024-06-30)
+  55/76 origins done (last: 2024-12-31)
+  61/76 origins done (last: 2025-06-30)
+  67/76 origins done (last: 2025-12-31)
+  73/76 origins done (last: 2026-06-30)
+  76/76 origins done (last: 2026-09-30)
+            variant commodity  horizon_months  n coverage_90 coverage_98 hit_rate_95  kupiec_p  christoffersen_ind_p  christoffersen_cc_p  crps  pinball_95  crps_rel_current
+          a_garch_t       gas               1 76         71%         92%         22%     0.000                 0.923                0.000  7.55        2.20             1.000
+          a_garch_t       gas               3 74         77%         91%         22%     0.000                 0.000                0.000 10.55        3.23             1.000
+          a_garch_t       gas              12 65         72%         83%         23%     0.000                 0.000                0.000 19.72        7.38             1.000
+          a_garch_t     power               1 76         76%         91%         14%     0.002                 0.551                0.006 17.68        4.44             1.000
+          a_garch_t     power               3 74         72%         89%         20%     0.000                 0.001                0.000 21.47        6.22             1.000
+          a_garch_t     power              12 65         71%         82%         25%     0.000                 0.000                0.000 35.48       14.11             1.000
+            b_gjr_t       gas               1 76         72%         92%         21%     0.000                 0.691                0.000  7.55        2.16             1.001
+            b_gjr_t       gas               3 74         76%         89%         22%     0.000                 0.000                0.000 10.57        3.22             1.002
+            b_gjr_t       gas              12 65         69%         83%         25%     0.000                 0.000                0.000 19.82        7.41             1.005
+            b_gjr_t     power               1 76         75%         92%         14%     0.002                 0.551                0.006 17.73        4.46             1.003
+            b_gjr_t     power               3 74         72%         86%         20%     0.000                 0.001                0.000 21.55        6.22             1.003
+            b_gjr_t     power              12 65         71%         80%         25%     0.000                 0.000                0.000 35.61       14.14             1.004
+       c_garch_jump       gas               1 76         74%         93%         20%     0.000                 0.168                0.000  7.57        2.08             1.002
+       c_garch_jump       gas               3 74         77%         95%         20%     0.000                 0.000                0.000 10.57        3.00             1.002
+       c_garch_jump       gas              12 65         71%         86%         25%     0.000                 0.000                0.000 19.79        7.27             1.004
+       c_garch_jump     power               1 76         76%         92%         13%     0.006                 0.731                0.022 17.76        4.40             1.005
+       c_garch_jump     power               3 74         72%         91%         20%     0.000                 0.000                0.000 21.48        5.89             1.000
+       c_garch_jump     power              12 65         71%         83%         25%     0.000                 0.000                0.000 35.55       14.00             1.002
+d_garch_t_no_anchor       gas               1 76         88%         99%          9%     0.130                 0.268                0.172  5.16        0.99             0.684
+d_garch_t_no_anchor       gas               3 74         86%         99%         12%     0.016                 0.072                0.011  8.88        2.21             0.841
+d_garch_t_no_anchor       gas              12 65         71%         88%         25%     0.000                 0.000                0.000 19.29        6.76             0.978
+d_garch_t_no_anchor     power               1 76         78%         91%         21%     0.000                 0.581                0.000 15.05        4.01             0.851
+d_garch_t_no_anchor     power               3 74         66%         91%         30%     0.000                 0.001                0.000 20.88        6.29             0.972
+d_garch_t_no_anchor     power              12 65         68%         80%         28%     0.000                 0.000                0.000 36.29       14.07             1.023
+        e_bootstrap       gas               1 76         88%         96%          5%     0.917                 0.502                0.794  5.35        1.04             0.709
+        e_bootstrap       gas               3 74         86%         97%          8%     0.258                 0.038                0.061  9.45        2.07             0.895
+        e_bootstrap       gas              12 65         69%         86%         22%     0.000                 0.000                0.000 25.02        8.09             1.269
+        e_bootstrap     power               1 76         86%         95%          8%     0.284                 0.307                0.334 24.32        8.34             1.375
+        e_bootstrap     power               3 74         89%         97%          7%     0.509                 0.391                0.557 29.82       12.05             1.388
+        e_bootstrap     power              12 65         95%         98%          0%     0.010                 1.000                0.036 65.95       43.16             1.859
+
+12-month selection scores:
+            variant  crps_rel  cov_min  cov_max  coverage_ok
+          a_garch_t     1.000    0.708    0.723        False
+            b_gjr_t     1.004    0.692    0.708        False
+       c_garch_jump     1.003    0.708    0.708        False
+d_garch_t_no_anchor     1.001    0.677    0.708        False
+        e_bootstrap     1.564    0.692    0.954        False
+
+Default: a_garch_t (unchanged) - no model variant has acceptable 12-month coverage: keep the current model
+Provenance: config 74ba766fd8c9 · data 8181ab654204 (2019-01-02..2026-11-23) · v0.5.0

@@ -1,4 +1,4 @@
-# HedgeWise: results on real data (v0.4, 23 Nov 2026)
+# HedgeWise: results on real data (v0.6, 23 Nov 2026)
 
 **v0.4 (for the 8 Dec Speeddate)** adds tools for real interviews; it does not change the model maths:
 - read real bills: any CSV or Excel export, Dutch formats, or yearly totals + sector
@@ -114,6 +114,53 @@ The fixed share is priced at today's fixed price. "Implied avg" is the volume-we
 * Today's fixed prices (gas €96, power €199/MWh) are already close to the 2022 averages, so "2022 repeats" adds only about €0.65m to a variable bill. The shock scenario is the one that hurts: €5.32m variable vs €3.56m with the plan.
 * By construction, fixing more always looks better in a price-rise scenario. The frontier and the backtest show the other side (2023, when prices fell).
 * It appears in the dashboard, the PDF and the CLI (with the implied prices), and in `output/stress_<date>.png`.
+
+## Model validation (out of sample, new in v0.6)
+
+`python validation.py`: at each of 76 month ends from June 2020, the model is fitted on data up to that date only,
+and it forecasts the average gas and power price over the next 1, 3 and 12 months (2,000 scenarios). Each forecast is
+scored against what happened. Five variants run on exactly the same test. Details and caveats are in
+`METHODOLOGY.md`; the numbers are in `output/validation_table.csv` and the chart in `output/validation.png`.
+
+**12-month horizon (the one the product advises on):**
+
+| Variant | Gas: 5–95% coverage (target 90%) | Power: coverage | Gas CRPS | Power CRPS | CRPS vs current |
+|---|---|---|---|---|---|
+| a) GARCH-t, **current** | 72% | 71% | 19.7 | 35.5 | 1.000 |
+| b) GJR-GARCH-t | 69% | 71% | 19.8 | 35.6 | 1.004 |
+| c) GARCH + jumps | 71% | 71% | 19.8 | 35.6 | 1.003 |
+| d) GARCH-t, no anchoring | 71% | 68% | 19.3 | 36.3 | 1.001 |
+| e) block bootstrap (no model) | 69% | 95% | 25.0 | 66.0 | 1.564 |
+
+The share of outcomes above the 95th percentile was 23–28% for every model variant a–d (target 5%). Kupiec and
+Christoffersen reject at p < 0.001 for every model variant at 12 months.
+
+**Decision (pre-registered rule): the default stays GARCH-t.** No model variant has acceptable 12-month coverage
+(80–95%), and none is more than 3% better on CRPS. The best is 0.1% *worse* than current. **Nothing was rerun**,
+because nothing changed: the backtest, report and as-of numbers above stay as they are.
+
+**What the validation shows:**
+1. **All models fail in the same place: the 2021–22 crisis build-up.** Every 12-month miss of every model comes from
+   forecasts made between mid-2020 and end-2021, when gas went from €10 to over €130/MWh. 12-month coverage for
+   forecasts made in that period: 28–40%. For forecasts made after the peak (July 2022 onwards): **90–92% for every
+   model**, which is well calibrated. A model fitted on calm history can't put a 5–10× price move inside its 90%
+   band. That's what the stress scenarios are for.
+2. **GJR asymmetry and jumps add nothing measurable**: CRPS within 0.5% of the current model at every horizon, and the
+   same coverage. On real gas data the asymmetry is small (γ = 0.03), and the jumps are rare upward moves
+   (2.4% of days, +5.6% on average).
+3. **Anchoring to the 30-day-average fixed-price proxy hurts at short horizons.** Without anchoring, CRPS is 32%
+   better for 1-month gas and 15% better for 1-month power, and 1-month gas coverage is 88% instead of 71%. A 30-day
+   average lags a trending market. At 12 months, the horizon HedgeWise advises on, the difference is gone (CRPS 0.98
+   gas, 1.02 power). With real forward prices, anchoring should behave differently: re-run the validation once
+   `data/forwards.csv` exists.
+4. **The no-model bootstrap is the best calibrated at 1–3 months for gas** (88%, with Kupiec not rejected), but
+   unusable for power at 12 months: CRPS 1.9× worse, with a band about 2.5× wider than the model's, because chaining
+   daily power changes ignores power's mean reversion.
+
+**What to say to the jury:** "We tested the model honestly: 76 monthly forecasts, each made with only the data
+available at the time. Outside the 2021–22 crisis, our 90% bands held 90–92% of outcomes. In the run-up to the
+crisis, no statistical model could see it coming: ours held 36–40%. That's why HedgeWise always shows a '2022
+happens again' stress test next to the model."
 
 ## Calibration
 
