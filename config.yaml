@@ -180,3 +180,45 @@ green:                            # green investments as a hedge (hedgewise/gree
                                   # fixed-price hedge). Enter a real quote to compare.
     shape: baseload               # ASSUMPTION: the PPA volume follows the company's load profile (no shape risk)
   annuity_rate: 0.05              # ASSUMPTION: cost of capital used to turn capex into a yearly cost
+
+market:                           # market size (market.py, MARKET.md). Sources: CBS StatLine open data (OData v3)
+  tables:
+    firms: "81589NED"             # Bedrijven; bedrijfstak - number of companies by SBI and size class (werkzame personen)
+    firms_period: "2026KW03"      # latest quarter with final-ish counts when this was written
+    establishments: "81578NED"    # Vestigingen van bedrijven; bedrijfstak, regio - for the Limburg share
+    establishments_period: "2026JJ00"
+    jobs: "83583NED"              # Banen van werknemers; bedrijfsgrootte en economische activiteit (SBI2008)
+    jobs_period: "2024JJ00"
+    energy: "83989NED"            # Energiebalans; aanbod en verbruik, sector
+    energy_period: "2024JJ00"     # last definitive year (2025 is 'nader voorlopig')
+  region_nl: "NL01"
+  region_limburg: "PV31"          # Limburg (PV)
+  size_classes: ["10-20", "20-50", "50-100", "100-250"]   # target: 10-250 werkzame personen
+  # ASSUMPTION: typical number of working persons in a company of each size class (used to spread a sector's energy
+  # use over its companies in proportion to their size; checked against CBS jobs per company in MARKET.md)
+  class_midpoint_persons: {"1": 1, "2": 2, "3-5": 4, "5-10": 7, "10-20": 14, "20-50": 32, "50-100": 70,
+                           "100-250": 155, "250+": 600}
+  sme_energy_intensity: 1.0       # ASSUMPTION: energy per person in a 10-250 company relative to the sector average.
+                                  # 1.0 = proportional to size (an UPPER bound: big plants are usually more energy-
+                                  # intensive per person); MARKET.md also shows 0.5
+  min_energy_gwh: 1.0             # ASSUMPTION: target only size classes whose estimated average gas + power use is at
+                                  # least 1 GWh/yr (below ~EUR 100k a year of energy, hedging advice is not worth a fee)
+  # Energy-intensive sectors. firms = SBI keys in 81589NED/81578NED (summed); energy = sector key in 83989NED;
+  # jobs = key in 83583NED, or null = estimate persons from firm counts x class midpoints (no jobs breakdown).
+  sectors:
+    - {name: "Food and drink (SBI 10-12)", firms: ["307610"], energy: "307610", jobs: "307610",
+       region: ["307600", "311300", "312200"]}   # 81578NED has no 10-12 total: sum of 10, 11 and 12
+    - {name: "Paper (SBI 17)", firms: ["317100"], energy: "317100", jobs: "317100"}
+    - {name: "Chemicals (SBI 20)", firms: ["320700"], energy: "320700", jobs: "320700"}
+    - {name: "Rubber and plastics (SBI 22)", firms: ["323700"], energy: "323700", jobs: "323700"}
+    - {name: "Glass, ceramics, cement, concrete (SBI 23)", firms: ["324600"], energy: "324600", jobs: "324600"}
+    - {name: "Basic metals (SBI 24)", firms: ["328100"], energy: "E007206", jobs: "328100"}
+    - {name: "Metal products (SBI 25)", firms: ["330300"], energy: "330300", jobs: "330300"}
+    - {name: "Greenhouse horticulture (SBI 0113x/0119x/0125x/0130x under glass)",
+       firms: ["301404", "301604", "302004", "302008", "302504", "302506"], energy: "E007247", jobs: null}
+  energy_prices_eur_mwh: {gas: 36.0, power: 87.0}   # 2025 average TTF / NL day-ahead (data/, RESULTS.md) -
+                                                    # commodity cost only, no tax or network costs
+  revenue:
+    subscription_eur: 3000        # ASSUMPTION (prompt): yearly subscription per company
+    eur_per_gwh: 150              # ASSUMPTION (prompt): plus EUR 150 per GWh of gas + power consumed
+    adoption: [0.01, 0.05, 0.10]  # ASSUMPTION (prompt): share of target companies that subscribe

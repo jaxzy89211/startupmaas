@@ -15,6 +15,7 @@ python audit.py data/audit_example.csv   # procurement audit: your past contract
 python report.py --audit data/audit_example.csv   # ... adds the audit as page 2 of the PDF
 python report.py --green-solar-kwp 1000 --green-battery-kwh 1000 --green-ppa-share 0.4   # + one green-investment line
 python validation.py               # out-of-sample model validation (~1-2 min) -> METHODOLOGY.md
+python market.py                  # market size from CBS open data -> MARKET.md numbers (--offline: data/cbs/ snapshot)
 python robustness.py --histories 200   # synthetic 8-year futures (~25 min on 4 cores; resumable, see below)
 python download_data.py --extended && python backtest.py --market DE-LU --years 2020 2021 2022 2023 2024 2025
 streamlit run app.py               # live demo dashboard in the browser
@@ -48,6 +49,7 @@ below works as before. When imported (`import backtest`, `import hedgewise_model
 | `hedgewise/validation.py` | Out-of-sample validation: monthly forecasts from June 2020, coverage / Kupiec / Christoffersen / CRPS / pinball for 5 variants, pre-registered selection rule |
 | `hedgewise/green.py` | Green investments as a hedge: hourly prices inside each simulated month (real day profiles × simulated monthly level), rooftop solar (self-consumption vs export at 80% of day-ahead), a battery (daily cycle + peak shaving), a PPA; their effect on the expected and bad-case bill, payback in normal vs crisis scenarios, extra points on the trade-off chart. Assumptions in `config.yaml` (`green`) |
 | `hedgewise/audit.py` | Procurement audit ("what would HedgeWise have saved you?"): past contracts per delivery year (share, price in EUR/MWh, ct/kWh, EUR/kWh, EUR/GJ or EUR/m³, optional date fixed; partial years allowed) vs all variable, fix 100% in October, 60% tranches, the 2-year ladder and the HedgeWise ladder, on real prices with the backtest's rules. Template: `data/audit_example.csv` (made-up company). App tab "Your past contracts" (EN/NL), optional PDF page 2 |
+| `hedgewise/market.py`, `MARKET.md` | Market size from CBS StatLine (tables 81589NED, 81578NED, 83583NED, 83989NED; snapshot in `data/cbs/` for offline runs): target companies NL and Limburg, their energy use and spend, revenue at 1/5/10% adoption |
 | `hedgewise/robustness.py` | Strategies on synthetic 8-year futures (model, block bootstrap, 3 named stress paths). Runs in chunks of 20 histories, each saved to `output/robustness_chunks/` as soon as it finishes (git-ignored); rerunning the same command resumes, and at most 4 worker processes are used |
 | `hedgewise/provenance.py` | Writes config hash, data hashes and data date range into every output |
 | `hedgewise/settings.py`, `config.py`, `naming.py`, `cli.py`, `_types.py` | Settings from config, config loader, output names, model CLI, type aliases |
