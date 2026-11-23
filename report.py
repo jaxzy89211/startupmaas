@@ -2,9 +2,11 @@
 
     python report.py --company data/company_example.csv --lang nl
 
-Imported as a module (e.g. `import report`), this file *is* `hedgewise.report`: it replaces itself in sys.modules,
+Imported as a module (`import report`), this file *is*
+`hedgewise.report`: it replaces itself in sys.modules,
 so attributes and monkeypatching behave exactly as on the package module.
 """
+
 import importlib
 import sys
 

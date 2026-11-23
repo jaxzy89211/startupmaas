@@ -8,6 +8,7 @@ HedgeWise one-page risk report (PDF, A4) for a CFO with no finance background.
 In code:  make_report(analysis, path_or_buffer, lang="en" | "nl", stress=None)
 All text lives in TEXT (one dict per language).
 """
+
 from __future__ import annotations
 
 import argparse
@@ -22,9 +23,12 @@ from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import cm
+from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 import hedgewise as hw
+from hedgewise._types import DateLike, PathOrBuffer
+from hedgewise.settings import DEFAULT_PATHS, DEFAULT_RISK_AVERSION, DEFAULT_SEED
 
 # ---- Fonts: embed DejaVu Sans (ships with matplotlib, no download). The built-in Helvetica has no glyph for "³"
 # (m³ rendered as "m "), and an embedded TTF also looks the same in every PDF viewer.
@@ -32,20 +36,30 @@ FONT, FONT_BOLD = "DejaVuSans", "DejaVuSans-Bold"
 
 
 def _register_fonts() -> None:
+    """Register DejaVu Sans (regular/bold/italic) with reportlab once."""
     import matplotlib
     from reportlab.lib.fonts import addMapping
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
+
     if FONT in pdfmetrics.getRegisteredFontNames():
         return
     d = Path(matplotlib.get_data_path()) / "fonts" / "ttf"
-    files = {FONT: "DejaVuSans.ttf", FONT_BOLD: "DejaVuSans-Bold.ttf",
-             "DejaVuSans-Oblique": "DejaVuSans-Oblique.ttf", "DejaVuSans-BoldOblique": "DejaVuSans-BoldOblique.ttf"}
+    files = {
+        FONT: "DejaVuSans.ttf",
+        FONT_BOLD: "DejaVuSans-Bold.ttf",
+        "DejaVuSans-Oblique": "DejaVuSans-Oblique.ttf",
+        "DejaVuSans-BoldOblique": "DejaVuSans-BoldOblique.ttf",
+    }
     for name, fn in files.items():
         pdfmetrics.registerFont(TTFont(name, str(d / fn)))
     # so that <b> / <i> inside Paragraphs use the matching DejaVu faces
-    for bold, italic, name in ((0, 0, FONT), (1, 0, FONT_BOLD), (0, 1, "DejaVuSans-Oblique"),
-                               (1, 1, "DejaVuSans-BoldOblique")):
+    for bold, italic, name in (
+        (0, 0, FONT),
+        (1, 0, FONT_BOLD),
+        (0, 1, "DejaVuSans-Oblique"),
+        (1, 1, "DejaVuSans-BoldOblique"),
+    ):
         addMapping(FONT, bold, italic, name)
 
 
@@ -70,22 +84,23 @@ TEXT = {
         "bill_note": "Gas and electricity commodity cost only, based on {n} simulated price scenarios.",
         "chart_h": "How much to fix: every option at a glance",
         "chart_note": "Each dot = a share of next year's energy fixed now. Left = a milder bad year; "
-                      "up = dearer on average. Star = our advice.",
+        "up = dearer on average. Star = our advice.",
         "rec_h": "Our recommendation",
         "rec": "Fix <b>{h}</b> of next year's gas and electricity, spread over <b>{k} monthly {tranche_word}</b>; "
-               "start with <b>{m}</b> this month.",
+        "start with <b>{m}</b> this month.",
         "rec_now": "Fix <b>{h}</b> of next year's gas and electricity, all of it this month.",
-        "tranche_one": "tranche", "tranche_many": "tranches",
+        "tranche_one": "tranche",
+        "tranche_many": "tranches",
         "rec_effect": "With this plan: expected bill {e}, bad case {es} (instead of {es0}).",
         "tradeoff": "Each extra 10% fixed costs about <b>{a}</b> on average and removes about <b>{b}</b> "
-                    "from the bad case.",
+        "from the bad case.",
         "stress_h": "What if 2022 happens again?",
         "stress_note": "Historical stress scenarios, not forecasts. Left: 2022 monthly prices as they were. Right: "
-                       "today's fixed price × (2022 avg ÷ 2021 avg), 2022 monthly pattern. Fixed share at today's price.",
+        "today's fixed price × (2022 avg ÷ 2021 avg), 2022 monthly pattern. Fixed share at today's price.",
         "footer": "<b>HedgeWise</b> · Assumptions: commodity cost only (no network tariffs, energy tax or supplier "
-                  "margin); {fixed}; volumes are "
-                  "taken as known. Scenarios come from a statistical model of past prices and can miss events "
-                  "that never happened before. This is decision support, not financial advice.",
+        "margin); {fixed}; volumes are "
+        "taken as known. Scenarios come from a statistical model of past prices and can miss events "
+        "that never happened before. This is decision support, not financial advice.",
         "fixed_proxy": "the fixed price is a proxy for real forward prices (recent market price + 5%)",
         "fixed_real": "fixed prices are real forward prices ({products})",
         "chart": {},
@@ -102,22 +117,24 @@ TEXT = {
         "bill_note": "Alleen de kosten van gas en elektriciteit zelf, op basis van {n} gesimuleerde prijsscenario's.",
         "chart_h": "Hoeveel vastzetten: alle opties in één oogopslag",
         "chart_note": "Elk punt = een deel van volgend jaar dat u nu vastzet. Links = een milder slecht jaar; "
-                      "hoger = gemiddeld duurder. Ster = ons advies.",
+        "hoger = gemiddeld duurder. Ster = ons advies.",
         "rec_h": "Ons advies",
         "rec": "Zet <b>{h}</b> van het gas en de elektriciteit voor volgend jaar vast, verdeeld over "
-               "<b>{k} maandelijkse {tranche_word}</b>; begin deze maand met <b>{m}</b>.",
+        "<b>{k} maandelijkse {tranche_word}</b>; begin deze maand met <b>{m}</b>.",
         "rec_now": "Zet <b>{h}</b> van het gas en de elektriciteit voor volgend jaar vast, alles deze maand.",
-        "tranche_one": "aankoop", "tranche_many": "aankopen",
+        "tranche_one": "aankoop",
+        "tranche_many": "aankopen",
         "rec_effect": "Met dit plan: verwachte rekening {e}, slecht scenario {es} (in plaats van {es0}).",
         "tradeoff": "Elke extra 10% vastzetten kost gemiddeld ongeveer <b>{a}</b> en haalt ongeveer <b>{b}</b> "
-                    "van het slechte scenario af.",
+        "van het slechte scenario af.",
         "stress_h": "Wat als 2022 zich herhaalt?",
         "stress_note": "Historische stressscenario's, geen voorspellingen. Links: maandprijzen 2022 zoals ze waren. "
-                       "Rechts: vaste prijs nu × (gem. 2022 ÷ gem. 2021), maandpatroon 2022. Vast deel tegen de prijs van nu.",
+        "Rechts: vaste prijs nu × (gem. 2022 ÷ gem. 2021), maandpatroon 2022. Vast deel tegen de prijs van nu.",
         "footer": "<b>HedgeWise</b> · Aannames: alleen de kosten van de energie zelf (geen netbeheerkosten, "
-                  "energiebelasting of leveranciersmarge); {fixed}; het verbruik wordt als bekend aangenomen. De scenario's komen uit een "
-                  "statistisch model van prijzen uit het verleden en kunnen gebeurtenissen missen die nog nooit "
-                  "zijn voorgekomen. Dit is beslisondersteuning, geen financieel advies.",
+        "energiebelasting of leveranciersmarge); {fixed}; het verbruik wordt als bekend aangenomen. "
+        "De scenario's komen uit een "
+        "statistisch model van prijzen uit het verleden en kunnen gebeurtenissen missen die nog nooit "
+        "zijn voorgekomen. Dit is beslisondersteuning, geen financieel advies.",
         "fixed_proxy": "de vaste prijs is een benadering van echte termijnprijzen (recente marktprijs + 5%)",
         "fixed_real": "de vaste prijzen zijn echte termijnprijzen ({products})",
         "chart": {
@@ -130,16 +147,31 @@ TEXT = {
         },
     },
 }
-TEXT["en"]["chart"] = {"xlabel": "Bad case: average of the worst 5% of scenarios (€ m)",
-                       "ylabel": "Expected bill (€ m)"}
-NL_MONTHS = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september",
-             "oktober", "november", "december"]
+TEXT["en"]["chart"] = {
+    "xlabel": "Bad case: average of the worst 5% of scenarios (€ m)",
+    "ylabel": "Expected bill (€ m)",
+}
+NL_MONTHS = [
+    "januari",
+    "februari",
+    "maart",
+    "april",
+    "mei",
+    "juni",
+    "juli",
+    "augustus",
+    "september",
+    "oktober",
+    "november",
+    "december",
+]
 
 
 # --------------------------------------------------------------------------------------------
 # Number formatting per language
 # --------------------------------------------------------------------------------------------
 def _num(x: float, lang: str, decimals: int = 0) -> str:
+    """Thousands separators: 1,234.5 (en) / 1.234,5 (nl)."""
     s = f"{x:,.{decimals}f}"
     return s.replace(",", "X").replace(".", ",").replace("X", ".") if lang == "nl" else s
 
@@ -154,10 +186,12 @@ def money(x: float, lang: str) -> str:
 
 
 def pct(x: float) -> str:
+    """0.55 -> '55%'."""
     return f"{x:.0%}"
 
 
 def date_str(d: pd.Timestamp, lang: str) -> str:
+    """'23 Nov 2026' (en) / '23 november 2026' (nl)."""
     d = pd.Timestamp(d)
     return f"{d.day} {d:%b %Y}" if lang == "en" else f"{d.day} {NL_MONTHS[d.month - 1]} {d.year}"
 
@@ -174,8 +208,9 @@ def tradeoff_per_10pct(a: hw.Analysis) -> tuple[float, float]:
 # --------------------------------------------------------------------------------------------
 # The report
 # --------------------------------------------------------------------------------------------
-def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = None,
-                today: pd.Timestamp | None = None) -> None:
+def make_report(
+    a: hw.Analysis, path: PathOrBuffer, lang: str = "en", stress: dict | None = None, today: pd.Timestamp | None = None
+) -> None:
     """Write the one-page PDF to `path` (file path or binary buffer).
     `stress` = output of hw.stress_test(a) (optional, adds one line)."""
     if lang not in TEXT:
@@ -187,47 +222,63 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
     n_paths = len(next(iter(a.costs.values())))
 
     ss = {
-        "title": ParagraphStyle("title", fontName=FONT_BOLD, fontSize=17, leading=21, textColor=INK,
-                                spaceAfter=3),
+        "title": ParagraphStyle("title", fontName=FONT_BOLD, fontSize=17, leading=21, textColor=INK, spaceAfter=3),
         "sub": ParagraphStyle("sub", fontName=FONT, fontSize=8.5, leading=11, textColor=MUTED),
-        "h": ParagraphStyle("h", fontName=FONT_BOLD, fontSize=11, leading=14, textColor=BRAND,
-                            spaceBefore=5, spaceAfter=2),
+        "h": ParagraphStyle(
+            "h", fontName=FONT_BOLD, fontSize=11, leading=14, textColor=BRAND, spaceBefore=5, spaceAfter=2
+        ),
         "body": ParagraphStyle("body", fontName=FONT, fontSize=9, leading=12.5, textColor=INK),
         "small": ParagraphStyle("small", fontName=FONT, fontSize=8, leading=10.5, textColor=MUTED),
         "big": ParagraphStyle("big", fontName=FONT_BOLD, fontSize=18, leading=21, textColor=INK),
         "lbl": ParagraphStyle("lbl", fontName=FONT, fontSize=9.5, leading=12, textColor=INK),
         "rec": ParagraphStyle("rec", fontName=FONT, fontSize=10.5, leading=14, textColor=INK),
-        "foot": ParagraphStyle("foot", fontName=FONT, fontSize=7, leading=9, textColor=MUTED,
-                               alignment=TA_LEFT),
+        "foot": ParagraphStyle("foot", fontName=FONT, fontSize=7, leading=9, textColor=MUTED, alignment=TA_LEFT),
     }
     W = A4[0] - 3.6 * cm
     story = []
-    story.append(Paragraph(_esc(c.name), ss["title"]))   # the report title is already in the green header bar
+    story.append(Paragraph(_esc(c.name), ss["title"]))  # the report title is already in the green header bar
     delivery = f"{a.delivery_start.year}"
-    story.append(Paragraph(T["prepared"].format(today=date_str(today, lang), as_of=date_str(a.model.as_of, lang),
-                                                delivery=delivery), ss["sub"]))
+    story.append(
+        Paragraph(
+            T["prepared"].format(today=date_str(today, lang), as_of=date_str(a.model.as_of, lang), delivery=delivery),
+            ss["sub"],
+        )
+    )
 
     # consumption
     story.append(Paragraph(T["consumption_h"], ss["h"]))
     gas_m3 = sum(c.gas_m3)
-    line = T["consumption"].format(gas_m3=_num(gas_m3, lang), gas_mwh=_num(gas_m3 * hw.MWH_PER_M3, lang),
-                                   power=_num(sum(c.power_kwh) / 1000, lang))
+    line = T["consumption"].format(
+        gas_m3=_num(gas_m3, lang), gas_mwh=_num(gas_m3 * hw.MWH_PER_M3, lang), power=_num(sum(c.power_kwh) / 1000, lang)
+    )
     if c.solar_kwp:
         line += T["solar"].format(kwp=_num(c.solar_kwp, lang))
     story.append(Paragraph(line, ss["body"]))
 
     # the bill if variable
     story.append(Paragraph(T["bill_h"], ss["h"]))
-    cells = [[Paragraph(T["expected_lbl"], ss["lbl"]), Paragraph(T["bad_lbl"], ss["lbl"])],
-             [Paragraph(money(var_row.expected, lang), ss["big"]),
-              Paragraph(f"<font color='#b8433a'>{money(var_row.es95, lang)}</font>", ss["big"])]]
+    cells = [
+        [Paragraph(T["expected_lbl"], ss["lbl"]), Paragraph(T["bad_lbl"], ss["lbl"])],
+        [
+            Paragraph(money(var_row.expected, lang), ss["big"]),
+            Paragraph(f"<font color='#b8433a'>{money(var_row.es95, lang)}</font>", ss["big"]),
+        ],
+    ]
     tb = Table(cells, colWidths=[W / 2, W / 2])
-    tb.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), FONT), ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f3f4f6")),
-                            ("BACKGROUND", (1, 0), (1, -1), RED_SOFT),
-                            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-                            ("LEFTPADDING", (0, 0), (-1, -1), 10), ("TOPPADDING", (0, 0), (-1, -1), 4),
-                            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
-                            ("LINEAFTER", (0, 0), (0, -1), 3, colors.white)]))
+    tb.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, -1), FONT),
+                ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#f3f4f6")),
+                ("BACKGROUND", (1, 0), (1, -1), RED_SOFT),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 4),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                ("LINEAFTER", (0, 0), (0, -1), 3, colors.white),
+            ]
+        )
+    )
     story.append(tb)
     story.append(Spacer(1, 2))
     story.append(Paragraph(T["bill_note"].format(n=_num(n_paths, lang)), ss["small"]))
@@ -236,8 +287,10 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
     story.append(Paragraph(T["chart_h"], ss["h"]))
     buf = io.BytesIO()
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
     fig, ax = plt.subplots(figsize=(8.2, 2.9))
     hw.plot_frontier(a, ax, text=T["chart"], show_tradeoff=False)
     ax.set_title("")
@@ -255,21 +308,41 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
     if r["execution"] == "now" or k == 1:
         rec_txt = T["rec_now"].format(h=pct(r["hedge_gas"]))
     else:
-        rec_txt = T["rec"].format(h=pct(r["hedge_gas"]), k=k, m=pct(r["buy_now_gas"]),
-                                  tranche_word=T["tranche_many"] if k > 1 else T["tranche_one"])
+        rec_txt = T["rec"].format(
+            h=pct(r["hedge_gas"]),
+            k=k,
+            m=pct(r["buy_now_gas"]),
+            tranche_word=T["tranche_many"] if k > 1 else T["tranche_one"],
+        )
     d_e, d_es = tradeoff_per_10pct(a)
-    rec_parts = [Paragraph(rec_txt, ss["rec"]), Spacer(1, 3),
-                 Paragraph(T["rec_effect"].format(e=money(hw_row.expected, lang), es=money(hw_row.es95, lang),
-                                                  es0=money(var_row.es95, lang)), ss["body"]),
-                 Paragraph(T["tradeoff"].format(a=money(d_e, lang), b=money(d_es, lang)), ss["body"])]
+    rec_parts = [
+        Paragraph(rec_txt, ss["rec"]),
+        Spacer(1, 3),
+        Paragraph(
+            T["rec_effect"].format(
+                e=money(hw_row.expected, lang), es=money(hw_row.es95, lang), es0=money(var_row.es95, lang)
+            ),
+            ss["body"],
+        ),
+        Paragraph(T["tradeoff"].format(a=money(d_e, lang), b=money(d_es, lang)), ss["body"]),
+    ]
     box = Table([[rec_parts]], colWidths=[W])
-    box.setStyle(TableStyle([("FONTNAME", (0, 0), (-1, -1), FONT), ("BACKGROUND", (0, 0), (-1, -1), SOFT),
-                             ("LINEBEFORE", (0, 0), (0, -1), 4, BRAND),
-                             ("LEFTPADDING", (0, 0), (-1, -1), 12), ("RIGHTPADDING", (0, 0), (-1, -1), 10),
-                             ("TOPPADDING", (0, 0), (-1, -1), 8), ("BOTTOMPADDING", (0, 0), (-1, -1), 9)]))
+    box.setStyle(
+        TableStyle(
+            [
+                ("FONTNAME", (0, 0), (-1, -1), FONT),
+                ("BACKGROUND", (0, 0), (-1, -1), SOFT),
+                ("LINEBEFORE", (0, 0), (0, -1), 4, BRAND),
+                ("LEFTPADDING", (0, 0), (-1, -1), 12),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 8),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 9),
+            ]
+        )
+    )
     story.append(box)
 
-    if stress:   # small stress chart in the bottom part of the page
+    if stress:  # small stress chart in the bottom part of the page
         story.append(Paragraph(T["stress_h"], ss["h"]))
         sbuf = io.BytesIO()
         fig, ax = plt.subplots(figsize=(8.2, 2.45))
@@ -281,7 +354,7 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
         story.append(Image(sbuf, width=W, height=W * 2.45 / 8.2))
         story.append(Paragraph(T["stress_note"], ss["small"]))
 
-    def _page(canv, doc):
+    def _page(canv: Canvas, doc: SimpleDocTemplate) -> None:
         canv.saveState()
         canv.setFillColor(BRAND)
         canv.rect(0, A4[1] - 1.1 * cm, A4[0], 1.1 * cm, fill=1, stroke=0)
@@ -301,33 +374,44 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
         canv.restoreState()
 
     _, foot_h = Paragraph(T["footer"].format(fixed=T["fixed_proxy"]), ss["foot"]).wrap(W, 5 * cm)
-    doc = SimpleDocTemplate(path, pagesize=A4, leftMargin=1.8 * cm, rightMargin=1.8 * cm,
-                            topMargin=1.7 * cm, bottomMargin=1.2 * cm + foot_h + 0.45 * cm,
-                            title=f"HedgeWise - {c.name}", author="HedgeWise")
+    doc = SimpleDocTemplate(
+        path,
+        pagesize=A4,
+        leftMargin=1.8 * cm,
+        rightMargin=1.8 * cm,
+        topMargin=1.7 * cm,
+        bottomMargin=1.2 * cm + foot_h + 0.45 * cm,
+        title=f"HedgeWise - {c.name}",
+        author="HedgeWise",
+    )
     doc.build(story, onFirstPage=_page, onLaterPages=_page)
     if doc.page != 1:
         raise RuntimeError(f"Report ran over one page ({doc.page} pages); shorten the text.")
 
 
 def _esc(s: str) -> str:
+    """Escape &, <, > for reportlab paragraphs."""
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
 
-def report_path(company_name: str, as_of) -> Path:
+def report_path(company_name: str, as_of: DateLike) -> Path:
+    """output/report_<company-slug>_<as-of date>.pdf"""
     slug = re.sub(r"[^a-z0-9]+", "_", company_name.lower()).strip("_") or "company"
     return hw.OUT / f"report_{slug}_{pd.Timestamp(as_of):%Y-%m-%d}.pdf"
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> Path:
+    """Command line: build the model, then write the PDF; returns its path."""
     from . import company_input
+
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     company_input.add_cli_args(ap)
     ap.add_argument("--lang", default="en", choices=list(TEXT))
     ap.add_argument("--as-of", help="decision date YYYY-MM-DD (default: last date with data)")
-    ap.add_argument("--risk-aversion", type=float, default=0.5)
+    ap.add_argument("--risk-aversion", type=float, default=DEFAULT_RISK_AVERSION)
     ap.add_argument("--budget", help="EUR or 'auto'")
-    ap.add_argument("--paths", type=int, default=10_000)
-    ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument("--paths", type=int, default=DEFAULT_PATHS)
+    ap.add_argument("--seed", type=int, default=DEFAULT_SEED)
     ap.add_argument("--solar-kwp", type=float, default=0.0)
     ap.add_argument("--out", help="output PDF path")
     args = ap.parse_args(argv)
@@ -342,4 +426,3 @@ def main(argv=None):
     make_report(a, str(out), args.lang, stress)
     print(f"Report written to {out}")
     return out
-

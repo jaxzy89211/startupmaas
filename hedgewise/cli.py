@@ -30,6 +30,7 @@ Usage
 Commodity cost only: network tariffs, energy tax, ODE and supplier margins are identical across
 strategies and are left out on purpose.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -40,28 +41,35 @@ import pandas as pd
 from .charts import plot_analysis, plot_fit, plot_stress
 from .data import demo_prices, load_prices
 from .models import describe, fit
-from .settings import OUT
-from .strategies import analyse, recommendation_text, stress_test
+from .settings import DEFAULT_PATHS, DEFAULT_RISK_AVERSION, DEFAULT_SEED, OUT
+from .strategies import Analysis, analyse, recommendation_text, stress_test
 
 
 # --------------------------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------------------------
-def main(argv=None):
+def main(argv: list[str] | None = None) -> Analysis:
+    """Run the model command line; returns the analysis."""
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--as-of", help="decision date YYYY-MM-DD (default: last date with data)")
     ap.add_argument("--delivery-start", help="first delivery month YYYY-MM-01 (default: next 1 January)")
-    ap.add_argument("--risk-aversion", type=float, default=0.5, help="0 = only expected cost, 1 = only bad case")
-    ap.add_argument("--paths", type=int, default=10_000)
-    ap.add_argument("--seed", type=int, default=42)
+    ap.add_argument(
+        "--risk-aversion", type=float, default=DEFAULT_RISK_AVERSION, help="0 = only expected cost, 1 = only bad case"
+    )
+    ap.add_argument("--paths", type=int, default=DEFAULT_PATHS)
+    ap.add_argument("--seed", type=int, default=DEFAULT_SEED)
     from . import company_input
+
     company_input.add_cli_args(ap)
     ap.add_argument("--solar-kwp", type=float, default=0.0)
     ap.add_argument("--demo", action="store_true", help="run on synthetic data")
     ap.add_argument("--show", action="store_true", help="open the chart window")
     ap.add_argument("--allow-timing", action="store_true", help="let HedgeWise fix everything at once")
-    ap.add_argument("--budget", help="energy budget in EUR, or 'auto' (last 12 months + 20%%); "
-                                     "switches to: smallest hedge that keeps VaR95 within budget")
+    ap.add_argument(
+        "--budget",
+        help="energy budget in EUR, or 'auto' (last 12 months + 20%%); "
+        "switches to: smallest hedge that keeps VaR95 within budget",
+    )
     args = ap.parse_args(argv)
 
     OUT.mkdir(exist_ok=True)
@@ -71,22 +79,37 @@ def main(argv=None):
     as_of = args.as_of or (str(df.index.max().date()) if not args.demo else "2021-06-30")
     m = fit(df, as_of)
     print(describe(m), "\n")
-    a = analyse(m, company, args.delivery_start, args.paths, args.seed, args.risk_aversion,
-                allow_timing=args.allow_timing, budget=args.budget)
+    a = analyse(
+        m,
+        company,
+        args.delivery_start,
+        args.paths,
+        args.seed,
+        args.risk_aversion,
+        allow_timing=args.allow_timing,
+        budget=args.budget,
+    )
     pd.set_option("display.width", 160)
     print((a.table / 1e3).round(0).astype(int).rename(columns=lambda c: c + " (kEUR)").to_string(), "\n")
-    print("Fixed price available today: " + ", ".join(
-        f"{k} {v:.1f} EUR/MWh [{a.recommendation['price_source'][k]}]" for k, v in a.fwd_now.items()))
+    print(
+        "Fixed price available today: "
+        + ", ".join(f"{k} {v:.1f} EUR/MWh [{a.recommendation['price_source'][k]}]" for k, v in a.fwd_now.items())
+    )
     print(recommendation_text(a))
     if not args.demo:
         st_ = stress_test(a, df)
         print("\nStress scenarios (historical, NOT forecasts), EUR k:")
         for sc in st_["scenarios"]:
             p = sc["avg_price"]
-            mult = (f", multiplier gas x{sc['multiplier']['gas']:.2f}, power x{sc['multiplier']['power']:.2f}"
-                    if sc["multiplier"]["gas"] else "")
-            print(f"  {sc['label']['en']}: implied average price gas {p['gas']:.0f}, power {p['power']:.0f} EUR/MWh{mult}")
-            print("    " + " | ".join(f"{k} {v/1e3:,.0f}" for k, v in sc["bills"].items()))
+            mult = (
+                f", multiplier gas x{sc['multiplier']['gas']:.2f}, power x{sc['multiplier']['power']:.2f}"
+                if sc["multiplier"]["gas"]
+                else ""
+            )
+            print(
+                f"  {sc['label']['en']}: implied average price gas {p['gas']:.0f}, power {p['power']:.0f} EUR/MWh{mult}"
+            )
+            print("    " + " | ".join(f"{k} {v / 1e3:,.0f}" for k, v in sc["bills"].items()))
     tag = ("demo_" if args.demo else "") + f"{m.as_of:%Y-%m-%d}"
     plot_analysis(a, OUT / f"analysis_{tag}.png")
     plot_fit(m, OUT / f"fit_{tag}.png")
@@ -97,6 +120,10 @@ def main(argv=None):
     print(f"\nCharts and tables written to {OUT}/  (analysis_{tag}.png, fit_{tag}.png)")
     if args.show:
         import matplotlib.pyplot as plt
+
         img = plt.imread(OUT / f"analysis_{tag}.png")
-        plt.figure(figsize=(14, 9)); plt.imshow(img); plt.axis("off"); plt.show()
+        plt.figure(figsize=(14, 9))
+        plt.imshow(img)
+        plt.axis("off")
+        plt.show()
     return a

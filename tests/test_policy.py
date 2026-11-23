@@ -1,4 +1,5 @@
 """policy_plan: equal monthly tranches, never front-loaded, target rise capped at 20 points."""
+
 import sys
 from pathlib import Path
 from types import SimpleNamespace
@@ -28,7 +29,7 @@ def test_cap_on_rise_between_dates():
 def test_first_date_uncapped_and_falls_are_free():
     assert hw.policy_plan(fake(0.9), 6)["target"] == pytest.approx(0.9)
     p = hw.policy_plan(fake(0.2), 3, prev_target=0.8, already=0.5)
-    assert p["target"] == pytest.approx(0.2) and p["buy_now"] == 0      # never sells back
+    assert p["target"] == pytest.approx(0.2) and p["buy_now"] == 0  # never sells back
 
 
 def test_cap_still_allows_full_hedge_in_one_season():

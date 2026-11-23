@@ -1,4 +1,5 @@
 """Tests for company_input.py   -   run:  python -m pytest -q"""
+
 import sys
 from pathlib import Path
 
@@ -14,25 +15,44 @@ from hedgewise_model import MWH_PER_M3  # noqa: E402
 
 
 # ---------------------------------------------------------------- numbers and months
-@pytest.mark.parametrize("vals, expected", [
-    (["1.234,5", "12.345,67", "800,0"], [1234.5, 12345.67, 800.0]),     # Dutch
-    (["1,234.5", "12,345.67", "800.0"], [1234.5, 12345.67, 800.0]),     # English
-    (["1.234", "12.345", "800"], [1234, 12345, 800]),                    # Dutch thousands only
-    (["1234,5", "99,25"], [1234.5, 99.25]),                              # Dutch decimal comma only
-    (["1,234", "12,345"], [1234, 12345]),                                # English thousands only
-    (["12.5", "7.25"], [12.5, 7.25]),                                    # plain decimals
-    (["1.233 kWh", "€ 2.000", " 1 500 "], [1233, 2000, 1500]),           # units / currency / spaces
-    ([1200, 3.5, None], [1200, 3.5, np.nan]),                            # already numeric (Excel)
-])
+@pytest.mark.parametrize(
+    "vals, expected",
+    [
+        (["1.234,5", "12.345,67", "800,0"], [1234.5, 12345.67, 800.0]),  # Dutch
+        (["1,234.5", "12,345.67", "800.0"], [1234.5, 12345.67, 800.0]),  # English
+        (["1.234", "12.345", "800"], [1234, 12345, 800]),  # Dutch thousands only
+        (["1234,5", "99,25"], [1234.5, 99.25]),  # Dutch decimal comma only
+        (["1,234", "12,345"], [1234, 12345]),  # English thousands only
+        (["12.5", "7.25"], [12.5, 7.25]),  # plain decimals
+        (["1.233 kWh", "€ 2.000", " 1 500 "], [1233, 2000, 1500]),  # units / currency / spaces
+        ([1200, 3.5, None], [1200, 3.5, np.nan]),  # already numeric (Excel)
+    ],
+)
 def test_parse_numbers(vals, expected):
     np.testing.assert_allclose(ci.parse_numbers(vals), expected, equal_nan=True)
 
 
-@pytest.mark.parametrize("cell, month", [
-    ("januari 2025", 1), ("Februari 2025", 2), ("mrt-25", 3), ("mei 2024", 5), ("okt 2025", 10),
-    ("Oct 2025", 10), ("december", 12), ("2025-07", 7), ("2025-07-31", 7), ("31-01-2025", 1),
-    ("01-2025", 1), ("5", 5), (11, 11), (pd.Timestamp("2025-09-01"), 9), ("totaal", None), ("13", None),
-])
+@pytest.mark.parametrize(
+    "cell, month",
+    [
+        ("januari 2025", 1),
+        ("Februari 2025", 2),
+        ("mrt-25", 3),
+        ("mei 2024", 5),
+        ("okt 2025", 10),
+        ("Oct 2025", 10),
+        ("december", 12),
+        ("2025-07", 7),
+        ("2025-07-31", 7),
+        ("31-01-2025", 1),
+        ("01-2025", 1),
+        ("5", 5),
+        (11, 11),
+        (pd.Timestamp("2025-09-01"), 9),
+        ("totaal", None),
+        ("13", None),
+    ],
+)
 def test_parse_month(cell, month):
     assert ci.parse_month(cell) == month
 
@@ -65,13 +85,32 @@ def _write(tmp_path, name, text):
 
 
 def test_dutch_supplier_csv(tmp_path):
-    rows = ["Verbruiksoverzicht Bakkerij De Vries", "Klantnummer;123456", "",
-            "Periode;Aardgas (m³);Elektriciteit (kWh);Kosten (€)"]
-    nl = ["januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september",
-          "oktober", "november", "december"]
+    rows = [
+        "Verbruiksoverzicht Bakkerij De Vries",
+        "Klantnummer;123456",
+        "",
+        "Periode;Aardgas (m³);Elektriciteit (kWh);Kosten (€)",
+    ]
+    nl = [
+        "januari",
+        "februari",
+        "maart",
+        "april",
+        "mei",
+        "juni",
+        "juli",
+        "augustus",
+        "september",
+        "oktober",
+        "november",
+        "december",
+    ]
     for i, m in enumerate(nl):
-        rows.append(f"{m} 2025;{10_000 + 1000 * i:,.0f};{150_000 + 500 * i:,.1f};999".replace(",", "X")
-                    .replace(".", ",").replace("X", "."))
+        rows.append(
+            f"{m} 2025;{10_000 + 1000 * i:,.0f};{150_000 + 500 * i:,.1f};999".replace(",", "X")
+            .replace(".", ",")
+            .replace("X", ".")
+        )
     p = _write(tmp_path, "nl_export.csv", "\n".join(rows))
     res = ci.load_company(p, name="De Vries")
     assert res.mapping["gas"] == "Aardgas (m³)" and res.mapping["power"] == "Elektriciteit (kWh)"
@@ -94,11 +133,10 @@ def test_excel_with_title_rows_mwh_and_gj(tmp_path):
 
 
 def test_mapping_override(tmp_path):
-    p = _write(tmp_path, "odd.csv", "when,a,b\n" + "\n".join(f"2025-{m:02d},{m},{100*m}" for m in range(1, 13)))
+    p = _write(tmp_path, "odd.csv", "when,a,b\n" + "\n".join(f"2025-{m:02d},{m},{100 * m}" for m in range(1, 13)))
     with pytest.raises(ValueError):
-        ci.load_company(p)   # columns 'a'/'b' can't be detected
-    res = ci.load_company(p, mapping={"date": "when", "gas": "a", "power": "b", "gas_unit": "MWh",
-                                      "power_unit": "kWh"})
+        ci.load_company(p)  # columns 'a'/'b' can't be detected
+    res = ci.load_company(p, mapping={"date": "when", "gas": "a", "power": "b", "gas_unit": "MWh", "power_unit": "kWh"})
     np.testing.assert_allclose(res.company.gas_m3[2], 3 / MWH_PER_M3)
     assert res.company.power_kwh[11] == 1200
 
@@ -115,7 +153,7 @@ def test_several_years_are_averaged(tmp_path):
 
 
 def test_few_missing_months_filled_with_warning(tmp_path):
-    lines = ["month,gas_m3,power_kwh"] + [f"2025-{m:02d},1000,5000" for m in range(1, 11)]   # Nov, Dec missing
+    lines = ["month,gas_m3,power_kwh"] + [f"2025-{m:02d},1000,5000" for m in range(1, 11)]  # Nov, Dec missing
     res = ci.load_company(_write(tmp_path, "gap.csv", "\n".join(lines)), sector="offices")
     assert all(np.isfinite(res.company.gas_m3)) and len(res.company.gas_m3) == 12
     assert any("Nov, Dec" in w and "profile" in w for w in res.warnings)
@@ -149,7 +187,7 @@ def test_yearly_totals(sector):
 def test_sector_shapes_differ():
     off = ci.profile("offices", "gas")
     metal = ci.profile("metal", "gas")
-    assert off[0] / off[6] > metal[0] / metal[6]          # offices are far more winter-heavy
+    assert off[0] / off[6] > metal[0] / metal[6]  # offices are far more winter-heavy
     for s in ci.SECTORS:
         for c in ("gas", "power"):
             assert ci.profile(s, c).sum() == pytest.approx(1)

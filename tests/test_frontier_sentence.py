@@ -1,4 +1,5 @@
 """The scale sentence under the trade-off chart matches the frontier's two ends."""
+
 import sys
 from pathlib import Path
 

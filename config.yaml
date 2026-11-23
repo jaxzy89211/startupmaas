@@ -1,0 +1,120 @@
+# HedgeWise configuration: every modelling assumption in one place.
+# Loaded once by hedgewise/config.py (override the file with the HEDGEWISE_CONFIG environment variable).
+# Changing a value here changes results; every output records a hash of this file (see hedgewise/provenance.py).
+# Floats with an exponent must be written like 1.0e-06 (YAML 1.1 reads "1e-6" as text).
+
+data:
+  start_date: "2019-01-01"        # first day of price history used
+  gas_lag_days: 3                 # price frame may run this many days past the last gas quote (weekend gap)
+
+units:
+  mwh_per_m3: 0.009769            # Dutch natural gas, 35.17 MJ/m3 (upper heating value) -> MWh
+  mwh_per_gj: 0.2778              # 1 GJ = 0.2778 MWh
+
+fixed_price:
+  premium: 0.05                   # stand-in for a forward curve: fixed price = 30-day mean spot x (1 + 5%)
+  lookback_days: 30               # window of that spot mean
+  anchor_to_forward: true         # market sets the price level (fixed price / (1+premium)), the model sets the risk
+
+garch:                            # GARCH(1,1) with Student-t errors, fitted by maximum likelihood (Nelder-Mead)
+  start_values:                   # (alpha, beta, nu) starting points; the best of the three fits is kept
+    - [0.08, 0.90, 5]
+    - [0.15, 0.80, 4]
+    - [0.05, 0.93, 8]
+  max_persistence: 0.999          # alpha + beta must stay below this (stationary variance)
+  nu_min: 2.1                     # Student-t degrees of freedom search range
+  nu_max: 100
+  maxiter: 4000                   # optimiser settings
+  xatol: 1.0e-08
+  fatol: 1.0e-06
+  trading_days_per_year: 252      # to annualise volatility in reports
+
+power_model:
+  fit_days: 730                   # window for the power-on-gas regression (2 years)
+  price_floor: 5.0                # EUR/MWh, floor before taking logs (11 negative-price days since 2019)
+  nu_bounds: [2.2, 60]            # search range for the innovations' degrees of freedom
+  phi_max: 0.99                   # AR(1) persistence cap
+
+fit:
+  min_history_days: 250           # refuse to fit on less than ~1 year of data
+  min_corr_obs: 60                # fewer common days -> assume uncorrelated shocks
+  min_eigenvalue: 1.0e-06         # floor when repairing the correlation matrix
+
+simulation:
+  n_paths: 10000                  # Monte Carlo scenarios for the CLI and the report
+  seed: 42                        # random seed: same seed + same data + same config = same numbers
+  nu_min: 4.0                     # simulate with at least 4 degrees of freedom (nu<4 has infinite kurtosis)
+  max_daily_vol: 0.10             # cap simulated daily gas/CO2 volatility at 10% (~160%/yr)
+  spike_headroom: 1.25            # power residual may go 25% beyond its historical range
+
+optimiser:
+  objective: mean_variance        # "mean_variance" (interior hedge ratios) or "mean_es" (v0.2, always 0% or 100%)
+  same_ratio: true                # one hedge ratio for gas and power (clearer advice; per-commodity costs <0.5% objective)
+  risk_aversion: 0.5              # default gamma
+  hedge_grid_step: 0.05           # hedge ratios tried: 0%, 5%, ..., 100%
+  risk_quantile: 0.95             # VaR / Expected Shortfall level
+  max_tranches: 6                 # monthly tranches before delivery (at most)
+  same_month_days: 7              # a month starting within this many days of the as-of date counts as "now"
+  budget_margin: 0.20             # budget "auto" = last 12 months' bill + 20%
+  budget_lookback_days: 365       # "last 12 months" for budget "auto"
+
+policy:
+  max_step: 0.20                  # HedgeWise policy: target may rise at most 20 points between monthly dates.
+                                  # Reason: 6 monthly dates = 5 steps, 5 x 20 = 100%; NOT tuned on the backtest.
+
+strategies:
+  partial_fixed_share: 0.6        # the "Fix 60% now" comparison strategy (and stress test)
+
+stress:
+  year: 2022                      # the crisis year that is replayed
+  prev_year: 2021                 # the year before (for the "shock as big as 2021->2022" scenario)
+
+solar:
+  yield_kwh_per_kwp: 900          # typical for south-east Netherlands
+  monthly_share: [3.0, 4.5, 8.0, 11.0, 13.0, 14.0, 14.0, 11.5, 9.0, 6.5, 3.5, 2.0]   # % of yearly yield, Jan..Dec
+
+company_default:                  # the hypothetical company used when no consumption data is given
+  name: "Limburg food processor (hypothetical)"
+  gas_m3_per_year: 1200000        # process steam (flat) + space heating (winter)
+  gas_monthly_share_pct: [11.5, 10.5, 9.5, 8.0, 7.0, 6.0, 5.5, 5.5, 6.5, 8.0, 10.0, 12.0]
+  power_kwh_per_year: 5000000     # flat production with a small summer cooling bump
+  power_monthly_share_pct: [8.2, 7.6, 8.3, 8.1, 8.4, 8.5, 8.9, 8.8, 8.4, 8.4, 8.2, 8.2]
+
+# Seasonal profiles per sector: % of the yearly volume per month (Jan..Dec).
+# THESE ARE ASSUMPTIONS (typical shapes, not measured data). Replace them with interview or pilot data.
+#   food processing : process steam all year + space heating in winter; flat power, small summer cooling bump
+#   metal           : mostly process heat (mildly seasonal); flat power with an August holiday dip
+#   greenhouse      : heating-dominated gas (CHP), strong winter peak; power for grow lights in winter
+#   offices         : gas almost only for space heating; nearly flat power, small summer holiday dip
+sector_profiles:
+  food processing:
+    gas:   [11.5, 10.5, 9.5, 8.0, 7.0, 6.0, 5.5, 5.5, 6.5, 8.0, 10.0, 12.0]
+    power: [8.2, 7.6, 8.3, 8.1, 8.4, 8.5, 8.9, 8.8, 8.4, 8.4, 8.2, 8.2]
+  metal:
+    gas:   [9.5, 9.0, 9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 8.0, 8.5, 9.0, 9.5]
+    power: [8.6, 8.2, 8.7, 8.3, 8.4, 8.3, 8.0, 6.8, 8.5, 8.7, 8.6, 8.9]
+  greenhouse horticulture:
+    gas:   [14.0, 12.5, 11.0, 8.0, 5.5, 3.5, 3.0, 3.0, 5.0, 8.0, 12.0, 14.5]
+    power: [12.0, 11.0, 10.0, 7.5, 5.5, 4.5, 4.5, 5.0, 6.5, 9.0, 11.5, 13.0]
+  offices:
+    gas:   [16.0, 14.0, 12.0, 8.0, 4.0, 2.0, 1.5, 1.5, 3.0, 8.0, 13.0, 17.0]
+    power: [9.0, 8.5, 8.6, 8.0, 7.8, 8.0, 8.2, 7.4, 8.1, 8.6, 8.8, 9.0]
+
+consumption_input:
+  max_missing_months: 3           # 1-3 missing months are filled from the sector profile; more is an error
+
+backtest:
+  years: [2021, 2022, 2023, 2024, 2025]
+  n_paths: 4000                   # fewer scenarios than the CLI: 30+ re-fits per run
+  risk_aversions: [0.3, 0.5, 0.8]
+  decision_months: [6, 7, 8, 9, 10, 11]   # as-of = last day of these months in year Y-1
+  typical_month: 10               # "fix 100% once a year" renewal month
+  pitch_year: 2022
+  policy_gamma: 0.5               # risk aversion used by the HedgeWise policy and ladder
+  ladder_base: 0.40               # HedgeWise ladder: share bought in H2 of Y-2
+  ladder_max_step: 0.10           # ladder target <= previous season's target + 10 points
+                                  # (ladder designed AFTER seeing the 2021-2025 results: not independent evidence)
+
+app:
+  scenario_choices: [2000, 5000, 10000]
+  default_scenarios: 5000

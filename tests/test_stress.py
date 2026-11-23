@@ -1,8 +1,8 @@
 """Sanity checks for the two historical stress scenarios (2022 repeat; 2021->2022-sized shock from today)."""
+
 import sys
 from pathlib import Path
 
-import numpy as np
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -28,7 +28,7 @@ def test_repeat_uses_realised_2022_prices(setup):
     monthly = y.groupby(y.index.month).mean().values
     v = a.company.gas_mwh
     assert rep["avg_price"]["gas"] == pytest.approx(float(v @ monthly / v.sum()))
-    assert 100 < rep["avg_price"]["gas"] < 150 and 200 < rep["avg_price"]["power"] < 290   # 2022 levels
+    assert 100 < rep["avg_price"]["gas"] < 150 and 200 < rep["avg_price"]["power"] < 290  # 2022 levels
 
 
 def test_shock_multiplier_is_2022_over_2021_annual_average(setup):
@@ -53,7 +53,7 @@ def test_bills_consistent(setup):
         assert b["HedgeWise"] == pytest.approx((1 - h) * b["All variable"] + h * b["Fix 100% now"])
         assert b["Fix 60% now"] == pytest.approx(0.4 * b["All variable"] + 0.6 * b["Fix 100% now"])
     sh = _sc(s, "shock")["bills"]
-    assert sh["All variable"] > sh["Fix 60% now"] > sh["Fix 100% now"]      # a shock raises prices
+    assert sh["All variable"] > sh["Fix 60% now"] > sh["Fix 100% now"]  # a shock raises prices
 
 
 def test_sentences_say_not_a_forecast_and_show_prices(setup):

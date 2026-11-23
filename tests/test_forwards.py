@@ -1,8 +1,8 @@
 """forwards.py: parsing, strict as-of lookup, and the switch from proxy to real forwards."""
+
 import sys
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -13,19 +13,27 @@ import hedgewise_model as hw  # noqa: E402
 EXAMPLE = ROOT / "data" / "forwards_example.csv"
 
 
-@pytest.mark.parametrize("name, parsed", [
-    ("TTF Cal-27", ("gas", 2027)), ("TTF Gas CAL27", ("gas", 2027)), ("NL Base Cal-27", ("power", 2027)),
-    ("Dutch Power Baseload Cal 2027", ("power", 2027)), ("NL Peak Cal-27", None), ("TTF Q1-27", None),
-    ("TTF Month Jan-27", None), ("something else", None),
-])
+@pytest.mark.parametrize(
+    "name, parsed",
+    [
+        ("TTF Cal-27", ("gas", 2027)),
+        ("TTF Gas CAL27", ("gas", 2027)),
+        ("NL Base Cal-27", ("power", 2027)),
+        ("Dutch Power Baseload Cal 2027", ("power", 2027)),
+        ("NL Peak Cal-27", None),
+        ("TTF Q1-27", None),
+        ("TTF Month Jan-27", None),
+        ("something else", None),
+    ],
+)
 def test_parse_product(name, parsed):
     assert forwards.parse_product(name) == parsed
 
 
 def test_latest_quote_on_or_before_as_of():
     assert forwards.forward_price("gas", "2026-11-20", 2027, EXAMPLE) == pytest.approx(73.10)
-    assert forwards.forward_price("gas", "2026-11-15", 2027, EXAMPLE) == pytest.approx(72.25)   # Dutch decimals
-    assert forwards.forward_price("gas", "2026-10-01", 2027, EXAMPLE) is None                    # nothing yet
+    assert forwards.forward_price("gas", "2026-11-15", 2027, EXAMPLE) == pytest.approx(72.25)  # Dutch decimals
+    assert forwards.forward_price("gas", "2026-10-01", 2027, EXAMPLE) is None  # nothing yet
     assert forwards.forward_price("power", "2026-11-23", 2027, EXAMPLE) == pytest.approx(151.40)  # base, not peak
     assert forwards.forward_price("power", "2026-11-23", 2030, EXAMPLE) is None
 

@@ -1,4 +1,5 @@
 """Price data: Dutch day-ahead power, TTF gas and (optional) EU ETS CO2, plus a synthetic demo history."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,7 +8,7 @@ import numpy as np
 import pandas as pd
 from scipy import signal
 
-from .settings import DATA
+from .settings import DATA, DATA_START, GAS_LAG_DAYS
 
 
 # --------------------------------------------------------------------------------------------
@@ -30,13 +31,16 @@ def load_prices(data_dir: Path = DATA) -> pd.DataFrame:
     Gas/CO2 are forward-filled over weekends; column 'gas_trade' flags real gas trading days."""
     g = pd.read_csv(data_dir / "gas_ttf.csv")
     gcol = "Close" if "Close" in g.columns else None
-    gas = (pd.Series(g[gcol].values, index=pd.to_datetime(g["Date"])) if gcol
-           else _read_investing_csv(data_dir / "gas_ttf.csv"))
+    gas = (
+        pd.Series(g[gcol].values, index=pd.to_datetime(g["Date"]))
+        if gcol
+        else _read_investing_csv(data_dir / "gas_ttf.csv")
+    )
     p = pd.read_csv(data_dir / "power_nl_daily.csv", index_col=0)
     pidx = pd.to_datetime(p.index, utc=True).tz_convert("Europe/Amsterdam").tz_localize(None).normalize()
     power = pd.Series(p.iloc[:, 0].values, index=pidx)
 
-    idx = pd.date_range("2019-01-01", min(power.index.max(), gas.index.max() + pd.Timedelta(days=3)), freq="D")
+    idx = pd.date_range(DATA_START, min(power.index.max(), gas.index.max() + pd.Timedelta(days=GAS_LAG_DAYS)), freq="D")
     df = pd.DataFrame(index=idx)
     df["power"] = power.reindex(idx)
     df["gas_trade"] = gas.reindex(idx).notna()
@@ -55,7 +59,7 @@ def demo_prices(seed: int = 7) -> pd.DataFrame:
     rng = np.random.default_rng(seed)
     idx = pd.date_range("2019-01-01", "2024-12-31", freq="D")
     t = np.arange(len(idx)) / 365
-    crisis = 2.2 * np.exp(-((t - 3.6) / 0.6) ** 2)
+    crisis = 2.2 * np.exp(-(((t - 3.6) / 0.6) ** 2))
     log_gas = np.log(15) + crisis + np.cumsum(rng.standard_t(4, len(idx)) * 0.025) * 0.6
     gas = np.exp(log_gas)
     season = 0.08 * np.cos(2 * np.pi * (idx.day_of_year - 15) / 365)

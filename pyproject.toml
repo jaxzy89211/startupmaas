@@ -1,0 +1,32 @@
+[project]
+name = "hedgewise"
+version = "0.5.0"
+description = "Energy price-risk model and dashboard for mid-sized Dutch companies"
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+extend-exclude = ["backup_v02"]
+
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I import order, UP pyupgrade, B bugbear,
+# D1 missing docstrings (public modules, classes, functions), ANN missing type hints
+select = ["E", "W", "F", "I", "UP", "B", "D1", "ANN001", "ANN201", "ANN202", "ANN204", "ANN205", "ANN206"]
+ignore = [
+    "D105",   # magic methods
+    "D107",   # __init__ (documented on the class)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["D", "ANN"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["hedgewise"]
+omit = ["hedgewise/charts.py"]   # plotting code is checked by looking at the charts, not by coverage
+
+[tool.coverage.report]
+show_missing = true

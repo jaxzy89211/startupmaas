@@ -2,9 +2,11 @@
 
     python company_input.py bills.xlsx
 
-Imported as a module (e.g. `import company_input`), this file *is* `hedgewise.company_input`: it replaces itself in sys.modules,
+Imported as a module (`import company_input`), this file *is*
+`hedgewise.company_input`: it replaces itself in sys.modules,
 so attributes and monkeypatching behave exactly as on the package module.
 """
+
 import importlib
 import sys
 

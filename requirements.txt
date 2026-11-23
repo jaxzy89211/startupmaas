@@ -7,6 +7,7 @@ matplotlib>=3.8
 streamlit>=1.50        # width="stretch" on st.image / st.dataframe
 reportlab>=4.0         # PDF report
 openpyxl>=3.1          # Excel uploads
+pyyaml>=6.0            # config.yaml
 # only needed for download_data.py (refreshing prices), not for the dashboard:
 requests>=2.31
 yfinance>=0.2.40

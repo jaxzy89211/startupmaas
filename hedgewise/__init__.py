@@ -15,43 +15,122 @@ Pipeline (each step only uses data available on the as-of date):
 
 Submodules not imported here (heavier or optional): report, backtest, company_input, forwards, cli.
 """
+
 from .charts import COLORS, FRONTIER_TEXT_EN, STRAT_COLORS, plot_analysis, plot_fit, plot_frontier, plot_stress
 from .company import Company, solar_mwh
 from .data import demo_prices, load_prices
 from .models import FittedModel, GarchT, PowerModel, describe, fit, fit_garch_t, fit_power
-from .settings import (ANCHOR_TO_FORWARD, BUDGET_MARGIN, DATA, FORWARD_LOOKBACK_DAYS, FORWARD_PREMIUM,
-                       MAX_DAILY_VOL, MONTHS, MWH_PER_M3, NU_MIN_SIM, OBJECTIVE, OUT, POLICY_MAX_STEP,
-                       POWER_FIT_DAYS, POWER_FLOOR, ROOT, SAME_RATIO, SOLAR_SHARE, SOLAR_YIELD_KWH_PER_KWP,
-                       STRESS_KEYS, STRESS_LABELS, STRESS_PREV_YEAR, STRESS_YEAR)
+from .settings import (
+    ANCHOR_TO_FORWARD,
+    BUDGET_MARGIN,
+    DATA,
+    FORWARD_LOOKBACK_DAYS,
+    FORWARD_PREMIUM,
+    MAX_DAILY_VOL,
+    MONTHS,
+    MWH_PER_M3,
+    NU_MIN_SIM,
+    OBJECTIVE,
+    OUT,
+    POLICY_MAX_STEP,
+    POWER_FIT_DAYS,
+    POWER_FLOOR,
+    ROOT,
+    SAME_RATIO,
+    SOLAR_SHARE,
+    SOLAR_YIELD_KWH_PER_KWP,
+    STRESS_KEYS,
+    STRESS_LABELS,
+    STRESS_PREV_YEAR,
+    STRESS_YEAR,
+)
 from .simulate import simulate
-from .strategies import (Analysis, analyse, frontier_scale, frontier_scale_sentence, policy_plan, real_forward,
-                         recommendation_text, risk_stats, season_adjustment, stress_sentence, stress_test,
-                         tranche_dates, trailing_bill)
+from .strategies import (
+    Analysis,
+    analyse,
+    frontier_scale,
+    frontier_scale_sentence,
+    policy_plan,
+    real_forward,
+    recommendation_text,
+    risk_stats,
+    season_adjustment,
+    stress_sentence,
+    stress_test,
+    trailing_bill,
+    tranche_dates,
+)
 
 __version__ = "0.5.0"
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> Analysis:
     """Model command line (same as `python hedgewise_model.py`)."""
     from .cli import main as _main
+
     return _main(argv)
 
 
 __all__ = [
     # data / company
-    "load_prices", "demo_prices", "Company", "solar_mwh",
+    "load_prices",
+    "demo_prices",
+    "Company",
+    "solar_mwh",
     # models and simulation
-    "fit", "fit_garch_t", "fit_power", "FittedModel", "GarchT", "PowerModel", "describe", "simulate",
+    "fit",
+    "fit_garch_t",
+    "fit_power",
+    "FittedModel",
+    "GarchT",
+    "PowerModel",
+    "describe",
+    "simulate",
     # strategies, risk, advice
-    "analyse", "Analysis", "risk_stats", "tranche_dates", "season_adjustment", "real_forward", "trailing_bill",
-    "policy_plan", "stress_test", "stress_sentence", "recommendation_text", "frontier_scale",
+    "analyse",
+    "Analysis",
+    "risk_stats",
+    "tranche_dates",
+    "season_adjustment",
+    "real_forward",
+    "trailing_bill",
+    "policy_plan",
+    "stress_test",
+    "stress_sentence",
+    "recommendation_text",
+    "frontier_scale",
     "frontier_scale_sentence",
     # charts
-    "plot_analysis", "plot_frontier", "plot_fit", "plot_stress", "COLORS", "STRAT_COLORS", "FRONTIER_TEXT_EN",
+    "plot_analysis",
+    "plot_frontier",
+    "plot_fit",
+    "plot_stress",
+    "COLORS",
+    "STRAT_COLORS",
+    "FRONTIER_TEXT_EN",
     # settings
-    "ROOT", "DATA", "OUT", "MWH_PER_M3", "FORWARD_PREMIUM", "FORWARD_LOOKBACK_DAYS", "POWER_FLOOR", "NU_MIN_SIM",
-    "MAX_DAILY_VOL", "POWER_FIT_DAYS", "ANCHOR_TO_FORWARD", "SAME_RATIO", "OBJECTIVE", "MONTHS", "SOLAR_SHARE",
-    "SOLAR_YIELD_KWH_PER_KWP", "POLICY_MAX_STEP", "STRESS_YEAR", "STRESS_PREV_YEAR", "STRESS_KEYS",
-    "STRESS_LABELS", "BUDGET_MARGIN",
-    "main", "__version__",
+    "ROOT",
+    "DATA",
+    "OUT",
+    "MWH_PER_M3",
+    "FORWARD_PREMIUM",
+    "FORWARD_LOOKBACK_DAYS",
+    "POWER_FLOOR",
+    "NU_MIN_SIM",
+    "MAX_DAILY_VOL",
+    "POWER_FIT_DAYS",
+    "ANCHOR_TO_FORWARD",
+    "SAME_RATIO",
+    "OBJECTIVE",
+    "MONTHS",
+    "SOLAR_SHARE",
+    "SOLAR_YIELD_KWH_PER_KWP",
+    "POLICY_MAX_STEP",
+    "STRESS_YEAR",
+    "STRESS_PREV_YEAR",
+    "STRESS_KEYS",
+    "STRESS_LABELS",
+    "BUDGET_MARGIN",
+    "main",
+    "__version__",
 ]

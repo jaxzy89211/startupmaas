@@ -6,7 +6,7 @@ Accepted inputs
   (b) any CSV or Excel export with a date/month column and gas and/or power columns. Column names
       are detected (Dutch or English); in the app the user can confirm or correct them.
   (c) only yearly totals (gas m3/yr, power kWh or MWh/yr) plus a sector, spread over the months with
-      the sector's seasonal profile (SECTOR_PROFILES below).
+      the sector's seasonal profile (config.yaml: sector_profiles).
 
 Units:   gas  m3 | kWh | MWh | GJ        power  kWh | MWh
 Formats: Dutch numbers ("1.234,5"), English numbers ("1,234.5"), Dutch/English month names
@@ -20,53 +20,29 @@ Several years   -> average per calendar month.
     res = load_company("bills.xlsx", name="Bakkerij X", sector="food processing")
     res.company, res.warnings, res.mapping
 """
+
 from __future__ import annotations
 
+import argparse
 import csv
 import dataclasses
 import io
 import re
+from collections.abc import Sequence
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
+from numpy.typing import ArrayLike
 
+from ._types import PathOrBuffer
 from .company import Company
-from .settings import MWH_PER_M3
+from .settings import MAX_MISSING_MONTHS, MWH_PER_GJ, MWH_PER_M3, SECTOR_PROFILES
 
-MWH_PER_GJ = 0.2778
-
-# --------------------------------------------------------------------------------------------
-# Seasonal profiles per sector: share of the yearly volume in each month (Jan..Dec, in %).
-# THESE ARE ASSUMPTIONS (typical shapes, not measured data). Replace them with interview or
-# pilot data as soon as you have it.
-#   food processing : process steam all year + space heating in winter; flat power, small summer cooling bump
-#   metal           : mostly process heat (mildly seasonal); flat power with an August holiday dip
-#   greenhouse      : heating-dominated gas (CHP), strong winter peak; power for grow lights in winter
-#   offices         : gas almost only for space heating; nearly flat power, small summer holiday dip
-# --------------------------------------------------------------------------------------------
-SECTOR_PROFILES = {
-    "food processing": {
-        "gas":   [11.5, 10.5, 9.5, 8.0, 7.0, 6.0, 5.5, 5.5, 6.5, 8.0, 10.0, 12.0],
-        "power": [8.2, 7.6, 8.3, 8.1, 8.4, 8.5, 8.9, 8.8, 8.4, 8.4, 8.2, 8.2],
-    },
-    "metal": {
-        "gas":   [9.5, 9.0, 9.0, 8.5, 8.0, 7.5, 7.0, 6.5, 8.0, 8.5, 9.0, 9.5],
-        "power": [8.6, 8.2, 8.7, 8.3, 8.4, 8.3, 8.0, 6.8, 8.5, 8.7, 8.6, 8.9],
-    },
-    "greenhouse horticulture": {
-        "gas":   [14.0, 12.5, 11.0, 8.0, 5.5, 3.5, 3.0, 3.0, 5.0, 8.0, 12.0, 14.5],
-        "power": [12.0, 11.0, 10.0, 7.5, 5.5, 4.5, 4.5, 5.0, 6.5, 9.0, 11.5, 13.0],
-    },
-    "offices": {
-        "gas":   [16.0, 14.0, 12.0, 8.0, 4.0, 2.0, 1.5, 1.5, 3.0, 8.0, 13.0, 17.0],
-        "power": [9.0, 8.5, 8.6, 8.0, 7.8, 8.0, 8.2, 7.4, 8.1, 8.6, 8.8, 9.0],
-    },
-}
+# Seasonal profiles per sector and the GJ factor come from config.yaml (sector_profiles, units).
 SECTORS = list(SECTOR_PROFILES)
 GAS_UNITS = ["m3", "kWh", "MWh", "GJ"]
 POWER_UNITS = ["kWh", "MWh"]
-MAX_MISSING_MONTHS = 3
 
 
 def profile(sector: str, commodity: str) -> np.ndarray:
@@ -81,7 +57,7 @@ def profile(sector: str, commodity: str) -> np.ndarray:
 # --------------------------------------------------------------------------------------------
 # Units
 # --------------------------------------------------------------------------------------------
-def gas_to_m3(values, unit: str) -> np.ndarray:
+def gas_to_m3(values: ArrayLike, unit: str) -> np.ndarray:
     """Convert gas volumes to m3 (the Company class stores gas in m3)."""
     v = np.asarray(values, float)
     u = _norm_unit(unit)
@@ -96,7 +72,8 @@ def gas_to_m3(values, unit: str) -> np.ndarray:
     raise ValueError(f"Unknown gas unit '{unit}'. Use one of {GAS_UNITS}")
 
 
-def power_to_kwh(values, unit: str) -> np.ndarray:
+def power_to_kwh(values: ArrayLike, unit: str) -> np.ndarray:
+    """Convert power volumes to kWh."""
     v = np.asarray(values, float)
     u = _norm_unit(unit)
     if u == "kwh":
@@ -107,13 +84,14 @@ def power_to_kwh(values, unit: str) -> np.ndarray:
 
 
 def _norm_unit(unit: str) -> str:
+    """Lower-case unit without spaces; m³ / m^3 -> m3."""
     return unit.strip().lower().replace("³", "3").replace("m^3", "m3").replace(" ", "")
 
 
 def unit_from_name(col: str, commodity: str) -> str | None:
     """Guess the unit from a column header like 'Aardgas (m³)' or 'Verbruik MWh'."""
     s = _norm_unit(str(col))
-    for u in (["gj", "mwh", "kwh", "m3", "nm3"] if commodity == "gas" else ["mwh", "kwh"]):
+    for u in ["gj", "mwh", "kwh", "m3", "nm3"] if commodity == "gas" else ["mwh", "kwh"]:
         if re.search(rf"(^|[^a-z]){u}($|[^a-z])", s) or s.endswith(u):
             return {"gj": "GJ", "mwh": "MWh", "kwh": "kWh", "m3": "m3", "nm3": "m3"}[u]
     return None
@@ -124,17 +102,16 @@ def unit_from_name(col: str, commodity: str) -> str | None:
 # --------------------------------------------------------------------------------------------
 _THOUSANDS_DOT = re.compile(r"^-?\d{1,3}(\.\d{3})+$")
 _THOUSANDS_COMMA = re.compile(r"^-?\d{1,3}(,\d{3})+$")
-_UNIT_SUFFIX = re.compile(r"\s*(m3|m³|nm3|kwh|mwh|gj)\s*$", re.IGNORECASE)   # "12.345 kWh" -> "12.345"
+_UNIT_SUFFIX = re.compile(r"\s*(m3|m³|nm3|kwh|mwh|gj)\s*$", re.IGNORECASE)  # "12.345 kWh" -> "12.345"
 
 
-def parse_numbers(values) -> np.ndarray:
+def parse_numbers(values: Sequence[object]) -> np.ndarray:
     """Parse a column of numbers written Dutch ('1.234,5'), English ('1,234.5') or plain.
     The format is decided per column, so '1.234' is read as 1234 when the column is Dutch."""
     raw = [("" if v is None or (isinstance(v, float) and np.isnan(v)) else v) for v in values]
     if all(isinstance(v, (int, float, np.number)) or v == "" for v in raw):
         return np.array([np.nan if v == "" else float(v) for v in raw])
-    s = [_UNIT_SUFFIX.sub("", str(v).strip().replace("€", "")).replace(" ", "").replace(" ", "")
-         for v in raw]
+    s = [_UNIT_SUFFIX.sub("", str(v).strip().replace("€", "")).replace(" ", "").replace(" ", "") for v in raw]
     nonempty = [x for x in s if x not in ("", "-")]
     both = [x for x in nonempty if "," in x and "." in x]
     if both:
@@ -162,16 +139,45 @@ def parse_numbers(values) -> np.ndarray:
 
 MONTH_NAMES = {
     # Dutch
-    "januari": 1, "jan": 1, "februari": 2, "feb": 2, "maart": 3, "mrt": 3, "mar": 3, "april": 4, "apr": 4,
-    "mei": 5, "juni": 6, "jun": 6, "juli": 7, "jul": 7, "augustus": 8, "aug": 8, "september": 9, "sep": 9,
-    "sept": 9, "oktober": 10, "okt": 10, "november": 11, "nov": 11, "december": 12, "dec": 12,
+    "januari": 1,
+    "jan": 1,
+    "februari": 2,
+    "feb": 2,
+    "maart": 3,
+    "mrt": 3,
+    "mar": 3,
+    "april": 4,
+    "apr": 4,
+    "mei": 5,
+    "juni": 6,
+    "jun": 6,
+    "juli": 7,
+    "jul": 7,
+    "augustus": 8,
+    "aug": 8,
+    "september": 9,
+    "sep": 9,
+    "sept": 9,
+    "oktober": 10,
+    "okt": 10,
+    "november": 11,
+    "nov": 11,
+    "december": 12,
+    "dec": 12,
     # English (where different)
-    "january": 1, "february": 2, "march": 3, "may": 5, "june": 6, "july": 7, "august": 8,
-    "october": 10, "oct": 10,
+    "january": 1,
+    "february": 2,
+    "march": 3,
+    "may": 5,
+    "june": 6,
+    "july": 7,
+    "august": 8,
+    "october": 10,
+    "oct": 10,
 }
 
 
-def parse_month(v) -> int | None:
+def parse_month(v: object) -> int | None:
     """Calendar month (1-12) of a cell, or None if it isn't recognisable."""
     if v is None or (isinstance(v, float) and np.isnan(v)):
         return None
@@ -188,18 +194,18 @@ def parse_month(v) -> int | None:
     if re.fullmatch(r"\d{1,2}", s):
         n = int(s)
         return n if 1 <= n <= 12 else None
-    m = re.fullmatch(r"(\d{4})[-/.](\d{1,2})([-/.]\d{1,2})?(\s.*)?", s)        # 2025-01, 2025-01-31
+    m = re.fullmatch(r"(\d{4})[-/.](\d{1,2})([-/.]\d{1,2})?(\s.*)?", s)  # 2025-01, 2025-01-31
     if m:
         return int(m.group(2)) if 1 <= int(m.group(2)) <= 12 else None
-    m = re.fullmatch(r"(\d{1,2})[-/.](\d{4})", s)                              # 01-2025
+    m = re.fullmatch(r"(\d{1,2})[-/.](\d{4})", s)  # 01-2025
     if m:
         return int(m.group(1)) if 1 <= int(m.group(1)) <= 12 else None
-    m = re.fullmatch(r"(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})(\s.*)?", s)       # 31-01-2025 (day first, NL)
+    m = re.fullmatch(r"(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})(\s.*)?", s)  # 31-01-2025 (day first, NL)
     if m:
         a, b = int(m.group(1)), int(m.group(2))
         if a > 12 and 1 <= b <= 12:
             return b
-        if b > 12 and 1 <= a <= 12:     # US style 01/31/2025
+        if b > 12 and 1 <= a <= 12:  # US style 01/31/2025
             return a
         return b if 1 <= b <= 12 else None
     try:
@@ -208,13 +214,14 @@ def parse_month(v) -> int | None:
         return None
 
 
-def parse_year(v) -> int | None:
+def parse_year(v: object) -> int | None:
+    """Year of a cell ('2025-01', 'jan-25', a Timestamp), or None."""
     if hasattr(v, "year") and not isinstance(v, (int, float)):
         return int(pd.Timestamp(v).year)
     m = re.search(r"(19|20)\d{2}", str(v))
     if m:
         return int(m.group(0))
-    m = re.search(r"[-/' ](\d{2})$", str(v).strip())   # 'jan-25', "mrt '25"
+    m = re.search(r"[-/' ](\d{2})$", str(v).strip())  # 'jan-25', "mrt '25"
     return 2000 + int(m.group(1)) if m else None
 
 
@@ -227,11 +234,12 @@ POWER_WORDS = ["elektr", "electr", "stroom", "power", "kwh", "mwh", "levering"]
 NOT_POWER = ["gas"]
 
 
-def _source_name(src) -> str:
+def _source_name(src: object) -> str:
+    """File name of a path or an uploaded file object."""
     return str(getattr(src, "name", src))
 
 
-def read_table(src) -> pd.DataFrame:
+def read_table(src: PathOrBuffer) -> pd.DataFrame:
     """Read a CSV (any delimiter) or Excel file into a DataFrame of raw values, with the header row found
     automatically (exports often have a few title lines above the table)."""
     name = _source_name(src).lower()
@@ -258,15 +266,17 @@ def read_table(src) -> pd.DataFrame:
         raw = pd.DataFrame([r + [""] * (width - len(r)) for r in rows], dtype=object)
     raw = raw.dropna(how="all").reset_index(drop=True)
     h = _header_row(raw)
-    cols = [str(c).strip() if str(c).strip() not in ("", "nan", "None") else f"col{i}"
-            for i, c in enumerate(raw.iloc[h])]
-    df = raw.iloc[h + 1:].reset_index(drop=True)
+    cols = [
+        str(c).strip() if str(c).strip() not in ("", "nan", "None") else f"col{i}" for i, c in enumerate(raw.iloc[h])
+    ]
+    df = raw.iloc[h + 1 :].reset_index(drop=True)
     df.columns = _dedupe(cols)
     df = df.replace("", np.nan).dropna(how="all")
     return df.dropna(axis=1, how="all").reset_index(drop=True)
 
 
-def _dedupe(cols):
+def _dedupe(cols: list[str]) -> list[str]:
+    """Make column names unique (a, a -> a, a_2)."""
     seen, out = {}, []
     for c in cols:
         seen[c] = seen.get(c, 0) + 1
@@ -275,6 +285,7 @@ def _dedupe(cols):
 
 
 def _header_row(raw: pd.DataFrame) -> int:
+    """Index of the first row that looks like a header (a date word and a consumption word)."""
     for i in range(min(15, len(raw))):
         cells = [str(x).lower() for x in raw.iloc[i] if str(x).strip() not in ("", "nan", "None")]
         has_date = any(any(w in c for w in DATE_WORDS) for c in cells)
@@ -289,19 +300,32 @@ def detect_columns(df: pd.DataFrame) -> dict:
     cols = list(df.columns)
     low = {c: str(c).lower() for c in cols}
 
-    def numeric_share(c):
+    def numeric_share(c: str) -> float:
         v = parse_numbers(df[c].tolist())
         return np.isfinite(v).mean() if len(v) else 0
 
     date = next((c for c in cols if any(w in low[c] for w in DATE_WORDS)), None)
-    if date is None:   # fall back to the first column whose cells look like months
+    if date is None:  # fall back to the first column whose cells look like months
         date = next((c for c in cols if df[c].map(parse_month).notna().mean() > 0.8), None)
     gas = next((c for c in cols if c != date and any(w in low[c] for w in GAS_WORDS) and numeric_share(c) > 0.5), None)
-    power = next((c for c in cols if c not in (date, gas) and any(w in low[c] for w in POWER_WORDS)
-                  and not any(w in low[c] for w in NOT_POWER) and numeric_share(c) > 0.5), None)
-    return {"date": date, "gas": gas, "power": power,
-            "gas_unit": (unit_from_name(gas, "gas") if gas else None) or "m3",
-            "power_unit": (unit_from_name(power, "power") if power else None) or "kWh"}
+    power = next(
+        (
+            c
+            for c in cols
+            if c not in (date, gas)
+            and any(w in low[c] for w in POWER_WORDS)
+            and not any(w in low[c] for w in NOT_POWER)
+            and numeric_share(c) > 0.5
+        ),
+        None,
+    )
+    return {
+        "date": date,
+        "gas": gas,
+        "power": power,
+        "gas_unit": (unit_from_name(gas, "gas") if gas else None) or "m3",
+        "power_unit": (unit_from_name(power, "power") if power else None) or "kWh",
+    }
 
 
 # --------------------------------------------------------------------------------------------
@@ -309,14 +333,18 @@ def detect_columns(df: pd.DataFrame) -> dict:
 # --------------------------------------------------------------------------------------------
 @dataclasses.dataclass
 class CompanyInput:
+    """A consumption profile plus the warnings and column mapping used to build it."""
+
     company: Company
     warnings: list
     mapping: dict
-    months_found: dict          # commodity -> sorted list of calendar months with data
+    months_found: dict  # commodity -> sorted list of calendar months with data
     years: list
 
 
-def _monthly_profile(months, years, values, commodity, sector, warnings):
+def _monthly_profile(
+    months: np.ndarray, years: np.ndarray, values: np.ndarray, commodity: str, sector: str, warnings: list[str]
+) -> tuple[np.ndarray | None, list[int]]:
     """Average per calendar month; fill 1-3 missing months from the sector profile."""
     s = pd.DataFrame({"m": months, "y": years, "v": values}).dropna(subset=["m", "v"])
     if s.empty:
@@ -327,25 +355,30 @@ def _monthly_profile(months, years, values, commodity, sector, warnings):
     have = [int(m) for m in per.index[per.notna()]]
     missing = [m for m in range(1, 13) if m not in have]
     if len(missing) > MAX_MISSING_MONTHS:
-        raise ValueError(f"{commodity}: only {len(have)} of 12 calendar months have data "
-                         f"(missing: {', '.join(_MONTH_ABBR[m-1] for m in missing)}). "
-                         f"Need at least {12 - MAX_MISSING_MONTHS} months, or enter yearly totals + sector instead.")
+        raise ValueError(
+            f"{commodity}: only {len(have)} of 12 calendar months have data "
+            f"(missing: {', '.join(_MONTH_ABBR[m - 1] for m in missing)}). "
+            f"Need at least {12 - MAX_MISSING_MONTHS} months, or enter yearly totals + sector instead."
+        )
     if missing:
         p = profile(sector, commodity)
         idx = np.array(have) - 1
         scale = per.loc[have].sum() / p[idx].sum()
         for m in missing:
             per.loc[m] = p[m - 1] * scale
-        warnings.append(f"{commodity}: no data for {', '.join(_MONTH_ABBR[m-1] for m in missing)}; filled in from "
-                        f"the '{sector}' seasonal profile (an assumption). Check these months with the company.")
+        warnings.append(
+            f"{commodity}: no data for {', '.join(_MONTH_ABBR[m - 1] for m in missing)}; filled in from "
+            f"the '{sector}' seasonal profile (an assumption). Check these months with the company."
+        )
     return per.values.astype(float), have
 
 
 _MONTH_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
 
 
-def company_from_frame(df: pd.DataFrame, mapping: dict | None = None, name: str = "Company",
-                       sector: str = "food processing") -> CompanyInput:
+def company_from_frame(
+    df: pd.DataFrame, mapping: dict | None = None, name: str = "Company", sector: str = "food processing"
+) -> CompanyInput:
     """Build a Company from a table of monthly consumption. `mapping` overrides detect_columns()."""
     mp = detect_columns(df)
     if mapping:
@@ -359,8 +392,10 @@ def company_from_frame(df: pd.DataFrame, mapping: dict | None = None, name: str 
     years = df[mp["date"]].map(parse_year)
     bad = int(months.isna().sum())
     if bad:
-        warnings.append(f"{bad} row(s) skipped: '{mp['date']}' is not a recognisable month "
-                        f"(e.g. '{df[mp['date']][months.isna()].iloc[0]}').")
+        warnings.append(
+            f"{bad} row(s) skipped: '{mp['date']}' is not a recognisable month "
+            f"(e.g. '{df[mp['date']][months.isna()].iloc[0]}')."
+        )
     n_years = len(set(y for y in years.dropna())) or 1
     if n_years > 1:
         warnings.append(f"Data covers {n_years} years; using the average per calendar month.")
@@ -384,16 +419,23 @@ def company_from_frame(df: pd.DataFrame, mapping: dict | None = None, name: str 
     return CompanyInput(comp, warnings, mp, found, sorted(int(y) for y in set(years.dropna())))
 
 
-def load_company(src, name: str | None = None, sector: str = "food processing",
-                 mapping: dict | None = None) -> CompanyInput:
+def load_company(
+    src: PathOrBuffer, name: str | None = None, sector: str = "food processing", mapping: dict | None = None
+) -> CompanyInput:
     """Read a CSV/Excel file (template or any export) and return the profile + warnings."""
     df = read_table(src)
     nm = name or Path(_source_name(src)).stem
     return company_from_frame(df, mapping, nm, sector)
 
 
-def from_yearly(gas: float = 0.0, gas_unit: str = "m3", power: float = 0.0, power_unit: str = "kWh",
-                sector: str = "food processing", name: str = "Company") -> CompanyInput:
+def from_yearly(
+    gas: float = 0.0,
+    gas_unit: str = "m3",
+    power: float = 0.0,
+    power_unit: str = "kWh",
+    sector: str = "food processing",
+    name: str = "Company",
+) -> CompanyInput:
     """Yearly totals only: spread over the months with the sector's seasonal profile."""
     if gas < 0 or power < 0:
         raise ValueError("Yearly totals can't be negative.")
@@ -407,15 +449,19 @@ def from_yearly(gas: float = 0.0, gas_unit: str = "m3", power: float = 0.0, powe
 
 
 def describe(res: CompanyInput) -> str:
+    """One-line summary of a consumption profile."""
     c = res.company
     gas_m3 = sum(c.gas_m3)
-    return (f"{c.name}: {gas_m3:,.0f} m3 gas ({gas_m3 * MWH_PER_M3:,.0f} MWh) and "
-            f"{sum(c.power_kwh)/1000:,.0f} MWh power per year")
+    return (
+        f"{c.name}: {gas_m3:,.0f} m3 gas ({gas_m3 * MWH_PER_M3:,.0f} MWh) and "
+        f"{sum(c.power_kwh) / 1000:,.0f} MWh power per year"
+    )
 
 
-def main(argv=None):
+def main(argv: list[str] | None = None) -> None:
     """Command-line entry point."""
     import argparse
+
     ap = argparse.ArgumentParser(description="Check how HedgeWise reads a consumption file.")
     ap.add_argument("file")
     ap.add_argument("--sector", default="food processing", choices=SECTORS)
@@ -431,24 +477,35 @@ def main(argv=None):
 # --------------------------------------------------------------------------------------------
 # Shared command-line options (hedgewise_model.py, backtest.py, report.py)
 # --------------------------------------------------------------------------------------------
-def add_cli_args(ap) -> None:
+def add_cli_args(ap: argparse.ArgumentParser) -> None:
+    """Add the shared company options (--company, --sector, --yearly-gas, ...) to a parser."""
     ap.add_argument("--company", help="consumption file: our template, or any CSV/Excel export of monthly bills")
     ap.add_argument("--name", help="company name (default: file name)")
-    ap.add_argument("--sector", default="food processing", choices=SECTORS,
-                    help="seasonal profile for yearly totals and for filling missing months")
+    ap.add_argument(
+        "--sector",
+        default="food processing",
+        choices=SECTORS,
+        help="seasonal profile for yearly totals and for filling missing months",
+    )
     ap.add_argument("--yearly-gas", type=float, help="yearly gas use, instead of a file (unit: --gas-unit)")
     ap.add_argument("--gas-unit", default="m3", choices=GAS_UNITS)
     ap.add_argument("--yearly-power", type=float, help="yearly power use, instead of a file (unit: --power-unit)")
     ap.add_argument("--power-unit", default="MWh", choices=POWER_UNITS)
 
 
-def company_from_args(args, verbose: bool = True) -> Company:
+def company_from_args(args: argparse.Namespace, verbose: bool = True) -> Company:
     """The Company described by the CLI options (default: the hypothetical food processor)."""
     if args.company:
         res = load_company(args.company, name=args.name, sector=args.sector)
     elif args.yearly_gas or args.yearly_power:
-        res = from_yearly(args.yearly_gas or 0, args.gas_unit, args.yearly_power or 0, args.power_unit,
-                          args.sector, args.name or f"{args.sector.title()} company")
+        res = from_yearly(
+            args.yearly_gas or 0,
+            args.gas_unit,
+            args.yearly_power or 0,
+            args.power_unit,
+            args.sector,
+            args.name or f"{args.sector.title()} company",
+        )
     else:
         return Company(name=args.name) if args.name else Company()
     if verbose:

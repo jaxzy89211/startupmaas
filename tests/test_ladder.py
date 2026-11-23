@@ -1,4 +1,5 @@
 """HedgeWise ladder in the backtest: 40% base layer, top-up capped at previous season's target + 10 points."""
+
 import sys
 from pathlib import Path
 
@@ -24,4 +25,4 @@ def test_cap_and_base(df, prev, cap):
     # the purchases add up: base layer + all top-ups = the share fixed
     assert bt.LADDER_BASE + sum(p["bought"] for p in log) == pytest.approx(info["ladder_fixed_share"], abs=1e-3)
     # never front-loaded: the first top-up is at most an equal 1/6 share of the gap to the (capped) target
-    assert log[0]["bought"] <= (log[0]["target"] - bt.LADDER_BASE) / 6 + 1e-4   # log rounds to 4 decimals
+    assert log[0]["bought"] <= (log[0]["target"] - bt.LADDER_BASE) / 6 + 1e-4  # log rounds to 4 decimals

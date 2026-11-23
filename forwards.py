@@ -2,9 +2,11 @@
 
     python forwards.py data/forwards.csv
 
-Imported as a module (e.g. `import forwards`), this file *is* `hedgewise.forwards`: it replaces itself in sys.modules,
+Imported as a module (`import forwards`), this file *is*
+`hedgewise.forwards`: it replaces itself in sys.modules,
 so attributes and monkeypatching behave exactly as on the package module.
 """
+
 import importlib
 import sys
 

@@ -1,26 +1,37 @@
 """Charts: scenario fan charts, trade-off (efficient frontier), model fit and stress scenarios."""
+
 from __future__ import annotations
 
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pandas as pd
 
+from ._types import PathOrBuffer
 from .models import POWER_FIT_DAYS, FittedModel, _power_design
 from .settings import STRESS_KEYS
 from .strategies import Analysis
 
+if TYPE_CHECKING:
+    from matplotlib.axes import Axes
 
-def plot_stress(s: dict, path=None, ax=None, lang: str = "en", compact: bool = False):
+
+def plot_stress(
+    s: dict, path: PathOrBuffer | None = None, ax: Axes | None = None, lang: str = "en", compact: bool = False
+) -> None:
     """Grouped bars: one group per scenario, one bar per strategy. compact=True for the PDF (smaller text)."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
     own = ax is None
     if own:
         fig, ax = plt.subplots(figsize=(9, 4.2))
-    names = {"en": ["All variable", f"HedgeWise (fix {s['hedge']:.0%})", "Fix 60% now", "Fix 100% now"],
-             "nl": ["Alles variabel", f"HedgeWise ({s['hedge']:.0%} vast)", "60% vast nu", "100% vast nu"]}[lang]
+    names = {
+        "en": ["All variable", f"HedgeWise (fix {s['hedge']:.0%})", "Fix 60% now", "Fix 100% now"],
+        "nl": ["Alles variabel", f"HedgeWise ({s['hedge']:.0%} vast)", "60% vast nu", "100% vast nu"],
+    }[lang]
     colors = ["#b8433a", "#1b9e5a", "#2a6fdb", "#6b7280"]
     scs = s["scenarios"]
     w = 0.2
@@ -30,7 +41,7 @@ def plot_stress(s: dict, path=None, ax=None, lang: str = "en", compact: bool = F
         xs = np.arange(len(scs)) + (j - 1.5) * w
         vals = [sc["bills"][key] / 1e6 for sc in scs]
         ax.bar(xs, vals, w * 0.92, color=colors[j], label=names[j])
-        for x, v in zip(xs, vals):
+        for x, v in zip(xs, vals, strict=False):
             t = f"{v:.2f}" if lang == "en" else f"{v:.2f}".replace(".", ",")
             ax.text(x, v + top * 0.015, t, ha="center", va="bottom", fontsize=fs - 0.5)
     ticks = []
@@ -45,11 +56,19 @@ def plot_stress(s: dict, path=None, ax=None, lang: str = "en", compact: bool = F
     ax.set_ylabel("€ m" if lang == "en" else "€ mln", fontsize=fs)
     ax.tick_params(axis="y", labelsize=fs)
     # legend in the empty top-left corner (the "repeat" bars are lower than the "shock" bars)
-    ax.legend(fontsize=fs - 0.5, frameon=False, ncol=4 if not compact else 2,
-              loc="upper center" if not compact else "upper left")
+    ax.legend(
+        fontsize=fs - 0.5,
+        frameon=False,
+        ncol=4 if not compact else 2,
+        loc="upper center" if not compact else "upper left",
+    )
     if not compact:
-        ax.set_title("What if 2022 happens again? (historical stress scenarios, not forecasts)" if lang == "en"
-                     else "Wat als 2022 zich herhaalt? (historische stressscenario's, geen voorspellingen)", fontsize=11)
+        ax.set_title(
+            "What if 2022 happens again? (historical stress scenarios, not forecasts)"
+            if lang == "en"
+            else "Wat als 2022 zich herhaalt? (historische stressscenario's, geen voorspellingen)",
+            fontsize=11,
+        )
     ax.spines[["top", "right"]].set_visible(False)
     ax.grid(axis="y", alpha=0.25)
     if own:
@@ -65,14 +84,17 @@ COLORS = {"gas": "#2a6fdb", "power": "#e07b00", "co2": "#4f8a3a"}
 STRAT_COLORS = ["#b8433a", "#8a8f98", "#4b5563", "#2a6fdb", "#1b9e5a"]
 
 
-def plot_analysis(a: Analysis, path: Path):
+def plot_analysis(a: Analysis, path: PathOrBuffer) -> None:
+    """Four-panel chart: gas and power scenario fans, trade-off frontier, expected vs bad-case bill."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.dates
     import matplotlib.pyplot as plt
+
     fig, axes = plt.subplots(2, 2, figsize=(14, 9))
     dates = a.sims["dates"]
-    for ax, c in zip(axes[0], ("gas", "power")):
+    for ax, c in zip(axes[0], ("gas", "power"), strict=False):
         hist = a.model.history[c].iloc[-730:]
         ax.plot(hist.index, hist.rolling(7).mean(), color=COLORS[c], lw=1.2, label="history (7-day avg)")
         # prepend the last 6 observed days so the 7-day average is a full window from day 1
@@ -96,8 +118,8 @@ def plot_analysis(a: Analysis, path: Path):
     y = np.arange(len(t))
     ax.barh(y, t.expected / 1e6, color="#cbd5e1", label="Expected")
     ax.barh(y, (t.es95 - t.expected) / 1e6, left=t.expected / 1e6, color="#ef8a62", label="extra in worst 5% (ES95)")
-    for i, (e, es) in enumerate(zip(t.expected, t.es95)):
-        ax.text(es / 1e6, i, f"  {es/1e6:.2f}", va="center", fontsize=8)
+    for i, (_e, es) in enumerate(zip(t.expected, t.es95, strict=False)):
+        ax.text(es / 1e6, i, f"  {es / 1e6:.2f}", va="center", fontsize=8)
     ax.set_yticks(y, [n.replace(" (", "\n(") for n in t.index], fontsize=8)
     ax.invert_yaxis()
     ax.set_title("Expected bill vs bad-case bill (EUR m)")
@@ -121,14 +143,22 @@ FRONTIER_TEXT_EN = {
 }
 
 
-def plot_frontier(a: Analysis, ax=None, path=None, text: dict | None = None, show_tradeoff: bool = True):
+def plot_frontier(
+    a: Analysis,
+    ax: Axes | None = None,
+    path: PathOrBuffer | None = None,
+    text: dict | None = None,
+    show_tradeoff: bool = True,
+) -> None:
     """Efficient frontier: expected bill vs bad-case bill (ES95) for one hedge ratio 0-100% (gas and power),
     executed the recommended way. The CFO picks a point; HedgeWise marks the one for their risk appetite.
     `text` overrides the labels (e.g. Dutch, see report.py); `path` may be a file path or a binary buffer."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
     from matplotlib.ticker import FuncFormatter
+
     tx = {**FRONTIER_TEXT_EN, **(text or {})}
     own = ax is None
     if own:
@@ -142,25 +172,38 @@ def plot_frontier(a: Analysis, ax=None, path=None, text: dict | None = None, sho
         is_lbl = np.isclose(h % 0.25, 0) or np.isclose(h % 0.25, 0.25)
         ax.plot(row.es95 / 1e6, row.expected / 1e6, "o", ms=6 if is_lbl else 3, color="#2a6fdb", zorder=3)
         if is_lbl:
-            ax.annotate(f"{h:.0%}", (row.es95 / 1e6, row.expected / 1e6), textcoords="offset points",
-                        xytext=(4, 6), fontsize=9, color="#1e3a8a")
+            ax.annotate(
+                f"{h:.0%}",
+                (row.es95 / 1e6, row.expected / 1e6),
+                textcoords="offset points",
+                xytext=(4, 6),
+                fontsize=9,
+                color="#1e3a8a",
+            )
     rec = f[np.isclose(f.hedge_gas, r["hedge_gas"])]
     if len(rec):
         h_txt = f"{r['hedge_gas']:.0%}"
         lbl = (tx["pick_budget"] if r["mode"] == "budget" else tx["pick"]).format(
-            h=h_txt, g=str(r["risk_aversion"]).replace(".", tx["decimal"]))
+            h=h_txt, g=str(r["risk_aversion"]).replace(".", tx["decimal"])
+        )
         ax.plot(rec.es95.iloc[0] / 1e6, rec.expected.iloc[0] / 1e6, "*", ms=18, color="#1b9e5a", zorder=4, label=lbl)
     if show_tradeoff and len(f) > 2:
         lo, hi = f.iloc[0], f.iloc[-1]
         d_e = (hi.expected - lo.expected) / 10 / 1e3
         d_es = (lo.es95 - hi.es95) / 10 / 1e3
-        ax.text(0.03, 0.05, tx["tradeoff"].format(e=f"{d_e:,.0f}", es=f"{d_es:,.0f}"),
-                transform=ax.transAxes, fontsize=9, color="#333")
+        ax.text(
+            0.03,
+            0.05,
+            tx["tradeoff"].format(e=f"{d_e:,.0f}", es=f"{d_es:,.0f}"),
+            transform=ax.transAxes,
+            fontsize=9,
+            color="#333",
+        )
     if tx["decimal"] == ",":
         fmt = FuncFormatter(lambda v, _: f"{v:.2f}".replace(".", ","))
         ax.xaxis.set_major_formatter(fmt)
         ax.yaxis.set_major_formatter(fmt)
-    ax.margins(x=0.07, y=0.12)   # room for the 0% / 100% labels at the ends
+    ax.margins(x=0.07, y=0.12)  # room for the 0% / 100% labels at the ends
     ax.set_xlabel(tx["xlabel"])
     ax.set_ylabel(tx["ylabel"])
     ax.set_title(tx["title"])
@@ -172,11 +215,13 @@ def plot_frontier(a: Analysis, ax=None, path=None, text: dict | None = None, sho
         plt.close(fig)
 
 
-def plot_fit(m: FittedModel, path: Path):
+def plot_fit(m: FittedModel, path: PathOrBuffer) -> None:
     """In-sample check: actual vs fitted power, and GARCH volatility over time."""
     import matplotlib
+
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
+
     h = m.history
     d = h.iloc[-POWER_FIT_DAYS:]
     X = _power_design(d.index, {k: np.log(d[k].values) for k in m.drivers})
@@ -188,7 +233,9 @@ def plot_fit(m: FittedModel, path: Path):
     ax[0].legend(frameon=False)
     for k in m.drivers:
         g = m.garch[k]
-        ax[1].plot(g.dates, np.sqrt(g.cond_var * 252) * 100, color=COLORS[k], lw=1, label=f"{k} (GARCH-t, nu={g.nu:.1f})")
+        ax[1].plot(
+            g.dates, np.sqrt(g.cond_var * 252) * 100, color=COLORS[k], lw=1, label=f"{k} (GARCH-t, nu={g.nu:.1f})"
+        )
     ax[1].set_title("Annualised volatility, %")
     ax[1].legend(frameon=False)
     for a_ in ax:
