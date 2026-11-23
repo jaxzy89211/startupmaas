@@ -10,3 +10,4 @@ output/_*
 # Real forward prices (Refinitiv/Bloomberg/EEX) are licensed: never commit or deploy them by accident.
 data/forwards.csv
 data/forwards.xlsx
+.coverage

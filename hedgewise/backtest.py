@@ -574,3 +574,4 @@ def main(argv: list[str] | None = None) -> pd.DataFrame:
         f"HedgeWise optimiser (risk aversion {lam_main}): EUR {r[hwk] / 1e6:.2f}m."
     )
     print(f"Charts: {hw.OUT}/pitch_{py}.png, pitch_cycle.png, backtest_all_years.png, backtest_calibration.png")
+    return res

@@ -385,6 +385,8 @@ def make_report(
         topMargin=1.7 * cm,
         bottomMargin=1.2 * cm + foot_h + 0.45 * cm,
         title=f"HedgeWise - {c.name}",
+        # every page starts in DejaVu: the default start font (Helvetica) would otherwise be referenced in the PDF
+        initialFontName=FONT,
         subject="HedgeWise provenance: " + json.dumps(provenance.current()),
         author="HedgeWise",
     )

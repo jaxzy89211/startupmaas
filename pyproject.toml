@@ -30,3 +30,6 @@ omit = ["hedgewise/charts.py"]   # plotting code is checked by looking at the ch
 
 [tool.coverage.report]
 show_missing = true
+fail_under = 80
+# plotting code is checked by looking at the charts (see the task notes), not by line coverage
+exclude_also = ["def plot_", "if TYPE_CHECKING:"]
