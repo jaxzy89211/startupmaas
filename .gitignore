@@ -12,3 +12,6 @@ data/forwards.csv
 data/forwards.xlsx
 .coverage
 output/robustness_chunks/
+
+# Real company documents (bills, contracts) never go into the repository
+data/private/

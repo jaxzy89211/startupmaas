@@ -222,3 +222,11 @@ market:                           # market size (market.py, MARKET.md). Sources:
     subscription_eur: 3000        # ASSUMPTION (prompt): yearly subscription per company
     eur_per_gwh: 150              # ASSUMPTION (prompt): plus EUR 150 per GWh of gas + power consumed
     adoption: [0.01, 0.05, 0.10]  # ASSUMPTION (prompt): share of target companies that subscribe
+
+extract:                          # reading invoices and contracts (extract.py). AI only READS; it never advises.
+  ai_model: "claude-opus-5-5"     # Anthropic model for engine (b); used only with ANTHROPIC_API_KEY set AND the user's
+                                  # explicit consent per upload ("send this document to the AI service")
+  ai_effort: "medium"             # thinking depth for extraction (reading, not reasoning-heavy)
+  ai_max_tokens: 16000
+  spike_factor: 3.0               # flag a month that is more than 3x the median month
+  price_range_eur_mwh: [1, 1000]  # flag prices outside this range (after unit conversion)

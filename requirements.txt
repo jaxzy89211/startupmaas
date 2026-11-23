@@ -8,6 +8,8 @@ streamlit>=1.67        # deferred download (callable data), width="stretch"
 reportlab>=4.0         # PDF report
 openpyxl>=3.1          # Excel uploads
 pyyaml>=6.0            # config.yaml
+pdfplumber>=0.11       # reading PDF invoices (extract.py, engine a)
+anthropic>=2.0         # optional AI engine for invoices (extract.py, engine b; needs ANTHROPIC_API_KEY + consent)
 # only needed for download_data.py (refreshing prices), not for the dashboard:
 requests>=2.31
 yfinance>=0.2.40
