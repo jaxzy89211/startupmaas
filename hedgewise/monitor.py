@@ -301,6 +301,11 @@ TXT = {
 }
 
 
+def _eur(x: float, lang: str) -> str:
+    """A price per MWh, rounded: €96 (en) / € 96 (nl)."""
+    return f"€{x:.0f}" if lang == "en" else f"€ {x:.0f}"
+
+
 def _signed(x: float, lang: str) -> str:
     s = f"{x:+.0%}"
     return s.replace(".", ",") if lang == "nl" else s
@@ -315,8 +320,8 @@ def todo_text(res: dict, lang: str) -> str:
         return T["buy"].format(
             s=pct(st["buy_now"]),
             year=row["delivery_year"],
-            g=f"€{row['gas_fixed']:.0f}",
-            p=f"€{row['power_fixed']:.0f}",
+            g=_eur(row["gas_fixed"], lang),
+            p=_eur(row["power_fixed"], lang),
             after=pct(st["bought"] + st["buy_now"]),
             target=pct(st["target"]),
         )
@@ -336,7 +341,10 @@ def flag_texts(res: dict, lang: str) -> list[str]:
         elif f["key"] == "price":
             out.append(
                 T["flag_price"].format(
-                    c=T[f["commodity"]], chg=_signed(f["change"], lang), old=f"€{f['old']:.0f}", new=f"€{f['new']:.0f}"
+                    c=T[f["commodity"]],
+                    chg=_signed(f["change"], lang),
+                    old=_eur(f["old"], lang),
+                    new=_eur(f["new"], lang),
                 )
             )
         else:
