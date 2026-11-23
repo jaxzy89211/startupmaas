@@ -21,5 +21,7 @@ def test_cap_and_base(df, prev, cap):
     assert all(p["cap"] == pytest.approx(cap) for p in log)
     assert all(bt.LADDER_BASE - 1e-9 <= p["target"] <= cap + 1e-9 for p in log)
     assert bt.LADDER_BASE - 1e-9 <= info["ladder_fixed_share"] <= cap + 1e-9
-    # never front-loaded: no single month buys more than the remaining gap spread over the remaining months
-    assert all(p["bought"] <= (cap - bt.LADDER_BASE) / 1 + 1e-9 for p in log)
+    # the purchases add up: base layer + all top-ups = the share fixed
+    assert bt.LADDER_BASE + sum(p["bought"] for p in log) == pytest.approx(info["ladder_fixed_share"], abs=1e-3)
+    # never front-loaded: the first top-up is at most an equal 1/6 share of the gap to the (capped) target
+    assert log[0]["bought"] <= (log[0]["target"] - bt.LADDER_BASE) / 6 + 1e-4   # log rounds to 4 decimals

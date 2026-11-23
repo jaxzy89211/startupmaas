@@ -28,7 +28,7 @@ Every chart and table is written to `output/`. See `RESULTS.md` for the numbers.
 | `backtest.py` | Strict backtest: each decision re-fits the model on data available on that date only. Writes `pitch_cycle.png` (main pitch chart) and `pitch_2022.png` |
 | `app.py` | Streamlit dashboard for the live demo: bill upload or yearly totals, stress test, PDF download |
 | `company_input.py` | Reads a company's consumption: our template, any CSV/Excel export (columns detected, Dutch formats), or yearly totals + sector profile |
-| `report.py` | One-page A4 PDF risk report in English or Dutch (`make_report(analysis, path, lang)`) |
+| `report.py` | One-page A4 PDF risk report in English or Dutch (`make_report(analysis, path, lang)`), DejaVu Sans embedded, with trade-off and stress charts |
 | `forwards.py` | Loads real forward prices from `data/forwards.csv` (if present) to replace the proxy |
 | `tests/` | pytest tests: input parsing, stress test, policy, forwards |
 | `data/company_example.csv` | Template for pilot data (month, gas_m3, power_kwh), one row per month of bills |
@@ -71,8 +71,9 @@ python backtest.py --company data/pilot_x.csv
 8. **Efficient frontier:** expected bill against bad-case bill for every share fixed, with the recommendation marked. This is the main chart for a CFO.
 9. **Risk metrics:** expected cost, median, 95% VaR, 95% Expected Shortfall (the average of the worst 5%), and the worst simulated year.
 10. **HedgeWise policy (v0.4, `policy_plan`):** the optimizer's share becomes a *target*. Its rise is capped at 20 percentage points between monthly decision dates, and the rest is bought in equal monthly tranches (never front-loaded, never sold back). Why 20: six monthly dates give five steps, and 5 × 20 = 100%. It isn't tuned on the backtest.
-11. **Stress test (v0.4, `stress_test`):** "what if 2022 happens again?" The monthly 2022 prices divided by the H1 2021 average are applied to today's fixed price, for all variable, the HedgeWise plan, and fixing 60% or 100% now. It's a historical stress scenario, not a forecast.
+11. **Stress test (`stress_test`):** two historical scenarios instead of one: (a) the 2022 monthly prices repeat exactly; (b) a shock as big as 2021→2022 from today (today's fixed price × 2022 avg / 2021 avg, with the 2022 monthly pattern; gas ×2.81, power ×2.35). The implied average prices are printed everywhere.
 12. **Real forwards (v0.4, `forwards.py`):** if `data/forwards.csv` exists (columns date, product such as `TTF Cal-27` / `NL Base Cal-27`, and price), the latest quote on or before the decision date replaces the proxy as the fixed price and as the anchor (expected spot = forward / 1.05). Every output says which source was used. `data/forwards.csv` is git-ignored because licensed data must not be pushed.
+13. **HedgeWise ladder (backtest only):** 40% in H2 of Y-2, then a top-up to the model's target in H2 of Y-1, capped at the previous season's target + 10 points. ⚠️ Designed after seeing the 2021–2025 results, so its backtest is not independent evidence.
 
 **Consumption input (v0.4, `company_input.py`):** units m³ / kWh / MWh / GJ for gas (1 GJ = 0.2778 MWh) and kWh / MWh for power. It handles Dutch numbers (`1.234,5`) and month names (`januari 2025`, `mrt-25`), and title rows above the table. With several years it averages per calendar month. If 1–3 months are missing it fills them from the sector profile with a warning; with more missing it raises an error. The sector profiles (food processing, metal, greenhouse horticulture, offices) are **assumptions** in `SECTOR_PROFILES`.
 

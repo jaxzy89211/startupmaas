@@ -17,8 +17,8 @@
   "mode": "risk_aversion",
   "objective": "mean_variance",
   "anchor_scale": {
-    "gas": 1.0456702761182846,
-    "power": 1.1719716557797004
+    "gas": 1.0325087897200909,
+    "power": 1.1621111100230568
   },
   "price_source": {
     "gas": "proxy (30-day spot + 5%)",

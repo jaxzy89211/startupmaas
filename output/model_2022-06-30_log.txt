@@ -16,6 +16,10 @@ If you stay fully variable: expected bill EUR 2.31m, but in the worst 5% of scen
 Recommendation (risk aversion 0.5): fix 90% of next year's gas and power, spread over 6 monthly tranches (2022-06, 2022-08, 2022-09, 2022-10, 2022-11, 2022-12); buy about 15% gas / 15% power this month.
 That cuts the bad-case bill (ES95) by EUR 3,679k for an expected extra cost of EUR 104k (the hedging premium).
 
-Historical stress scenario, not a forecast: if prices rose from today's level as much as they did from early 2021 to 2022 (gas ×5.7, power ×4.3), staying variable would cost €12.36m, the HedgeWise plan €3.42m and fixing 100% now €2.43m.
+Stress scenarios (historical, NOT forecasts), EUR k:
+  2022 prices repeat: implied average price gas 124, power 243 EUR/MWh
+    All variable 2,670 | HedgeWise 2,454 | Fix 60% now 2,526 | Fix 100% now 2,430
+  A shock as big as 2021→2022, from today: implied average price gas 295, power 527 EUR/MWh, multiplier gas x2.81, power x2.35
+    All variable 6,099 | HedgeWise 2,797 | Fix 60% now 3,898 | Fix 100% now 2,430
 
 Charts and tables written to /Users/brunokardas/hedgewise/output/  (analysis_2022-06-30.png, fit_2022-06-30.png)
