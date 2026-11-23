@@ -33,6 +33,19 @@ With interview mode on, the page shows five steps and hides all model settings.
    * **Upload bills**: a CSV or Excel file with one row per month (a supplier-portal export works). HedgeWise finds
      the date, gas and power columns and their units itself; check what it found in the boxes that appear. If 1–3
      months are missing, it fills them in and says so; with more missing it asks for more data.
+   * **Invoices or contracts (PDF)**: upload one or more PDF bills, annual statements or supplier contracts.
+     HedgeWise reads the monthly gas and power use, prices and contract dates and shows them in a table, each with
+     the sentence it was read from. **Check every number against the document, correct it in the table, then
+     click "Bevestig deze getallen / Confirm these numbers".** Nothing is used before you confirm. Prices found go
+     to step 3 (check the share: it's set to 100%). Yellow notes flag months that look wrong (3× the usual
+     month, missing months, the same month in two documents).
+     By default the PDFs are read on the computer itself, with simple rules: a scanned (photographed) bill can't be
+     read that way, so type its numbers in. If the app has an AI key, a box appears to send the documents to the
+     AI service (Anthropic) for better reading. **Tick it only if the company agrees: bills are confidential.** The
+     AI only reads; it never gives advice.
+     **Never put a real company's documents in the project folder** (or only in `data/private/`, which is never
+     uploaded to GitHub).
+
    The green line shows the yearly totals it will use. **Read them out to the interviewee and check them.**
 3. **Past contracts (optional)**: see section 3.
 4. **Results** (Resultaten) appear by themselves: see section 4.
@@ -156,5 +169,7 @@ about 5 points with the number of scenarios; that's noise, not a different view.
 * **The app is slow the first time:** normal (about 10 s). The past-contracts comparison takes about a minute the
   first time.
 * **Anything else:** take a screenshot and send it to Bruno.
+
+![Reading a PDF (a fake document), Dutch](docs/img/05_interview_pdf_nl.png)
 
 *Screenshots were taken with `python tools/screenshots.py` (headless Chrome) from the app as of 23 Nov 2026.*

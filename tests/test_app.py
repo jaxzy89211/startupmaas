@@ -35,7 +35,7 @@ def test_sector_and_upload_modes():
     at = _app()
     at.sidebar.selectbox(key="sector").select("offices").run()
     assert not at.exception and any("offices" in w.value for w in at.sidebar.warning)
-    at.sidebar.radio(key="source").set_value("Upload bills (CSV / Excel)").run()
+    at.sidebar.radio(key="source").set_value("upload").run()
     assert not at.exception and at.sidebar.info
 
 
@@ -79,3 +79,14 @@ def test_green_investments_section():
     assert "+ solar 1 MWp: expected bill" in md and "+ PPA 40%: expected bill" in md
     at.radio(key="lang").set_value("NL").run()
     assert not at.exception and "+ zon 1 MWp: verwachte rekening" in " ".join(m.value for m in at.markdown)
+
+
+def test_invoice_pdf_route_waits_for_files_and_confirmation():
+    at = _app()
+    at.toggle(key="interview").set_value(True).run()
+    at.radio(key="source").set_value("pdf").run()
+    assert not at.exception
+    assert any("Fill in step 2 first" in i.value for i in at.info)  # no file yet: nothing is used
+    at.radio(key="lang").set_value("NL").run()
+    assert not at.exception and at.radio(key="source").value == "pdf"  # the choice survives the language switch
+    assert "Facturen of contracten (PDF)" in at.radio(key="source").options

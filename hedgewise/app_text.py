@@ -23,6 +23,21 @@ UI = {
         "source": "Consumption data",
         "src_yearly": "Yearly totals + sector",
         "src_upload": "Upload bills (CSV / Excel)",
+        "src_pdf": "Invoices or contracts (PDF)",
+        "pdf_upload": "Invoices, annual statements or supplier contracts (PDF; several at once)",
+        "pdf_consent": "Send these documents to the AI service (Anthropic) to read them. Only with the company's "
+        "permission: bills are confidential.",
+        "pdf_no_key": "AI reading is off (no ANTHROPIC_API_KEY); documents are read on this computer with simple "
+        "rules.",
+        "pdf_reading": "Reading the documents ...",
+        "pdf_check": "Check every number against the document (the quote shows where it came from), correct it in "
+        "the table, then confirm. Nothing is used before you confirm.",
+        "pdf_engine": "{file}: read with {engine}",
+        "pdf_contracts": "Prices found (these go to 'past contracts'; the share is set to 100%: check it)",
+        "pdf_confirm": "Confirm these numbers",
+        "pdf_confirmed": "Confirmed. HedgeWise now uses these monthly volumes.",
+        "pdf_wait": "Check the table and click 'Confirm these numbers'.",
+        "pdf_empty": "No monthly consumption was found. Enter the numbers in the table, or use yearly totals.",
         "source_help": "Upload 12-24 months of bills or a supplier-portal export, or just enter yearly totals.",
         "sector": "Sector (seasonal profile)",
         "sector_help": "Used to spread yearly totals over the months and to fill 1-3 missing months. "
@@ -144,6 +159,22 @@ UI = {
         "source": "Verbruiksgegevens",
         "src_yearly": "Jaartotalen + sector",
         "src_upload": "Facturen uploaden (CSV / Excel)",
+        "src_pdf": "Facturen of contracten (PDF)",
+        "pdf_upload": "Facturen, jaarafrekeningen of leverancierscontracten (PDF; meerdere tegelijk)",
+        "pdf_consent": "Stuur deze documenten naar de AI-dienst (Anthropic) om ze te lezen. Alleen met toestemming "
+        "van het bedrijf: facturen zijn vertrouwelijk.",
+        "pdf_no_key": "Lezen met AI staat uit (geen ANTHROPIC_API_KEY); de documenten worden op deze computer met "
+        "eenvoudige regels gelezen.",
+        "pdf_reading": "Documenten lezen ...",
+        "pdf_check": "Controleer elk getal met het document (het citaat laat zien waar het vandaan komt), verbeter "
+        "het in de tabel en bevestig. Niets wordt gebruikt voordat u bevestigt.",
+        "pdf_engine": "{file}: gelezen met {engine}",
+        "pdf_contracts": "Gevonden prijzen (die gaan naar 'eerdere contracten'; het aandeel staat op 100%: "
+        "controleer dat)",
+        "pdf_confirm": "Bevestig deze getallen",
+        "pdf_confirmed": "Bevestigd. HedgeWise gebruikt nu deze maandvolumes.",
+        "pdf_wait": "Controleer de tabel en klik op 'Bevestig deze getallen'.",
+        "pdf_empty": "Er is geen maandverbruik gevonden. Vul de getallen in de tabel in, of gebruik jaartotalen.",
         "source_help": "Upload 12-24 maanden facturen of een export uit het leveranciersportaal, of vul alleen "
         "jaartotalen in.",
         "sector": "Sector (seizoensprofiel)",

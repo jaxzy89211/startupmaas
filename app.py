@@ -105,11 +105,20 @@ def report_pdf(
 # --------------------------------------------------------------------------------------------
 def consumption_input(T: dict, name: str) -> tuple[hw.Company | None, list[str]]:
     """Yearly totals + sector, or an uploaded bill file with the detected columns. (None, []) = waiting for a file."""
-    source = st.radio(T["source"], [T["src_yearly"], T["src_upload"]], help=T["source_help"], key="source")
+    # option values are language-independent (only the labels are translated), so switching language keeps them
+    source = st.radio(
+        T["source"],
+        ["yearly", "upload", "pdf"],
+        format_func=lambda k: T[f"src_{k}"],
+        help=T["source_help"],
+        key="source",
+    )
     sector = st.selectbox(
         T["sector"], ci.SECTORS, help=T["sector_help"], key="sector", format_func=lambda x: sector_label(x, LANG)
     )
-    if source == T["src_upload"]:
+    if source == "pdf":
+        return pdf_input(T, name, sector)
+    if source == "upload":
         up = st.file_uploader(T["upload"], type=["csv", "txt", "xlsx", "xls"], key="bills")
         if up is None:
             st.info(T["upload_wait"])
@@ -155,6 +164,83 @@ def consumption_input(T: dict, name: str) -> tuple[hw.Company | None, list[str]]
         except ValueError as e:
             st.error(str(e))
             return None, []
+    company = res.company
+    st.success(
+        T["volumes"].format(gas=number(sum(company.gas_m3), LANG), power=number(sum(company.power_kwh) / 1e3, LANG))
+    )
+    for n_ in res.warnings:
+        st.warning(warning_text(n_, LANG))
+    return company, res.warnings
+
+
+def pdf_input(T: dict, name: str, sector: str) -> tuple[hw.Company | None, list[str]]:
+    """Invoices/contracts (PDF) -> editable table with source quotes -> Confirm -> consumption profile.
+    The AI service is offered only when a key is set, and used only when the box is ticked."""
+    import os
+
+    from hedgewise import extract as xt
+
+    files = st.file_uploader(T["pdf_upload"], type=["pdf"], accept_multiple_files=True, key="pdfs")
+    if not files:
+        st.info(T["upload_wait"])
+        return None, []
+    consent = False
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        consent = st.checkbox(T["pdf_consent"], False, key="pdf_consent")
+    else:
+        st.caption(T["pdf_no_key"])
+    sig = (tuple((f.name, f.size) for f in files), consent)
+    if st.session_state.get("pdf_sig") != sig:  # read once per set of files (and consent choice)
+        with st.spinner(T["pdf_reading"]):
+            exs = [xt.extract(f.getvalue(), f.name, consent=consent) for f in files]
+        st.session_state.update(pdf_sig=sig, pdf_exs=exs, pdf_confirmed=None)
+    exs = st.session_state["pdf_exs"]
+    for ex in exs:
+        st.caption(T["pdf_engine"].format(file=ex.source, engine="AI (Anthropic)" if ex.engine == "ai" else "rules"))
+        for w in ex.warnings:
+            st.warning(w)
+    for flag in xt.validate(exs):
+        st.warning(flag)
+    st.caption(T["pdf_check"])
+    table = xt.monthly_table(exs)
+    if table.empty:
+        st.info(T["pdf_empty"])
+        table = pd.DataFrame(
+            {
+                "month": [""],
+                "gas_m3": [None],
+                "power_kwh": [None],
+                "source": [""],
+                "page": [None],
+                "quote": [""],
+                "confidence": [None],
+            }
+        )
+    edited = st.data_editor(
+        table,
+        num_rows="dynamic",
+        width="stretch",
+        key="pdf_table",
+        disabled=["source", "page", "quote", "confidence"],
+        column_config={"quote": st.column_config.TextColumn(width="large")},
+    )
+    contracts = xt.contracts_table(exs)
+    if len(contracts):
+        st.caption(T["pdf_contracts"])
+        contracts = st.data_editor(contracts, width="stretch", key="pdf_contracts", disabled=["source", "quote"])
+    if st.button(T["pdf_confirm"], type="primary", key="pdf_confirm_btn"):
+        st.session_state["pdf_confirmed"] = edited.to_json()
+        st.session_state["contracts_prefill"] = contracts.drop(columns=["source", "quote"]) if len(contracts) else None
+    if st.session_state.get("pdf_confirmed") != edited.to_json():  # not confirmed, or edited after confirming
+        st.info(T["pdf_wait"])
+        return None, []
+    try:
+        clean = edited.dropna(subset=["month"]).query("month != ''")
+        res = xt.confirmed_company(clean, name, sector)
+    except ValueError as e:
+        st.error(str(e))
+        return None, []
+    st.success(T["pdf_confirmed"])
     company = res.company
     st.success(
         T["volumes"].format(gas=number(sum(company.gas_m3), LANG), power=number(sum(company.power_kwh) / 1e3, LANG))
@@ -240,6 +326,9 @@ def audit_ui(company: hw.Company, T: dict, lang: str) -> None:
             for k in example
         ]
     )
+    pre = st.session_state.get("contracts_prefill")
+    if pre is not None and len(pre):  # prices read from the confirmed PDFs (step 2)
+        default_rows = pre.rename(columns=cols)
     up_c = st.file_uploader(T["audit_upload"], type=["csv", "txt", "xlsx", "xls"], key="audit_upload")
     if up_c is not None:
         try:
@@ -387,19 +476,19 @@ with st.sidebar:
 
     st.header(T["decision_h"])
     dates = {
-        T["date_today"]: str(df.index.max().date()),
-        T["date_2021"]: "2021-06-30",
-        T["date_2022"]: "2022-06-30",
-        T["date_custom"]: None,
+        "date_today": str(df.index.max().date()),
+        "date_2021": "2021-06-30",
+        "date_2022": "2022-06-30",
+        "date_custom": None,
     }
-    choice = st.selectbox(T["date"], list(dates), key="date")
+    choice = st.selectbox(T["date"], list(dates), format_func=lambda k: T[k], key="date")
     as_of = dates[choice] or str(
         st.date_input(
             T["as_of"], pd.Timestamp("2021-09-30"), min_value=pd.Timestamp("2020-01-31"), max_value=df.index.max()
         )
     )
-    mode = st.radio(T["goal"], [T["goal_balance"], T["goal_budget"]], key="goal")
-    if mode == T["goal_balance"]:
+    mode = st.radio(T["goal"], ["goal_balance", "goal_budget"], format_func=lambda k: T[k], key="goal")
+    if mode == "goal_balance":
         lam = st.slider(T["risk"], 0.0, 1.0, DEFAULT_RISK_AVERSION, 0.1, help=T["risk_help"], key="risk")
         budget = None
     else:
