@@ -16,6 +16,10 @@ fixed_price:
   lookback_days: 30               # window of that spot mean
   anchor_to_forward: true         # market sets the price level (fixed price / (1+premium)), the model sets the risk
 
+model:
+  variance: garch_t               # gas/CO2 volatility model: garch_t (default) | gjr_t | garch_jump.
+                                  # Chosen ONLY on the out-of-sample validation (validation.py, METHODOLOGY.md).
+
 garch:                            # GARCH(1,1) with Student-t errors, fitted by maximum likelihood (Nelder-Mead)
   start_values:                   # (alpha, beta, nu) starting points; the best of the three fits is kept
     - [0.08, 0.90, 5]
@@ -114,6 +118,19 @@ backtest:
   ladder_base: 0.40               # HedgeWise ladder: share bought in H2 of Y-2
   ladder_max_step: 0.10           # ladder target <= previous season's target + 10 points
                                   # (ladder designed AFTER seeing the 2021-2025 results: not independent evidence)
+
+validation:                       # out-of-sample test of the price model (python validation.py)
+  first_origin: "2020-06-30"      # first forecast date (month ends from here to the last complete horizon)
+  horizons_months: [1, 3, 12]     # forecast the average price over the next 1, 3 and 12 months
+  n_paths: 2000                   # scenarios per forecast (CRPS sampling noise << differences between variants)
+  seed: 7
+  bootstrap_block_days: 30        # block length of the historical block bootstrap benchmark
+  # Pre-registered selection rule (set BEFORE seeing results): among the model variants (a-d), the default becomes
+  # the one with the lowest mean 12-month CRPS relative to the current model (average over gas and power), if it is
+  # more than crps_margin better AND its 5-95% coverage at 12 months is within coverage_ok for both commodities.
+  # Otherwise the current model stays. The bootstrap (e) is a benchmark only.
+  crps_margin: 0.03
+  coverage_ok: [0.80, 0.95]
 
 app:
   scenario_choices: [2000, 5000, 10000]

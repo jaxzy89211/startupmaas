@@ -37,10 +37,25 @@ def simulate(
         z = L @ rng.standard_normal((k, n_paths))
         for i, d in enumerate(m.drivers):
             g = m.garch[d]
-            if bday[t]:
+            if bday[t] and g.kind == "garch_t":  # the default; kept exactly as before (same random draws)
                 eps = _std_t(rng, z[i], max(g.nu, NU_MIN_SIM)) * np.sqrt(var[d])
                 logp[d] = logp[d] + eps - 0.5 * var[d]  # martingale in price
                 var[d] = g.omega + g.alpha * eps**2 + g.beta * var[d]
+                var[d] = np.minimum(var[d], MAX_DAILY_VOL**2)
+            elif bday[t] and g.kind == "gjr_t":  # rises (eps > 0) raise next-day variance by gamma * eps^2 more
+                eps = _std_t(rng, z[i], max(g.nu, NU_MIN_SIM)) * np.sqrt(var[d])
+                logp[d] = logp[d] + eps - 0.5 * var[d]
+                var[d] = g.omega + (g.alpha + g.gamma * (eps > 0)) * eps**2 + g.beta * var[d]
+                var[d] = np.minimum(var[d], MAX_DAILY_VOL**2)
+            elif (
+                bday[t] and g.kind == "garch_jump"
+            ):  # normal diffusion + Poisson jumps, compensated to stay a martingale
+                eps = z[i] * np.sqrt(var[d])
+                jump = np.where(rng.random(n_paths) < g.jump_lam, rng.normal(g.jump_mu, g.jump_sig, n_paths), 0.0)
+                r = eps + jump
+                comp = g.jump_lam * (np.exp(g.jump_mu + 0.5 * g.jump_sig**2) - 1)
+                logp[d] = logp[d] + r - 0.5 * var[d] - comp
+                var[d] = g.omega + g.alpha * r**2 + g.beta * var[d]
                 var[d] = np.minimum(var[d], MAX_DAILY_VOL**2)
             out[d][t] = np.exp(logp[d])
         e = _std_t(rng, z[-1], max(pm.nu, NU_MIN_SIM)) * pm.sigma

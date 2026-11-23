@@ -20,6 +20,7 @@ from .settings import (
     MIN_CORR_OBS,
     MIN_EIGENVALUE,
     MIN_HISTORY_DAYS,
+    MODEL_VARIANCE,
     POWER_FIT_DAYS,
     POWER_FLOOR,
     POWER_NU_BOUNDS,
@@ -31,6 +32,8 @@ DAYS_PER_YEAR = 365.25  # calendar convention for the annual seasonality terms
 WEEKEND_DAYS = (5, 6)  # Saturday, Sunday (pandas day_of_week)
 _INFEASIBLE = 1e12  # negative log-likelihood returned for parameters outside the allowed region
 _PERSISTENCE_FLOOR = 1e-6  # guards the long-run variance formula when alpha + beta is ~1
+_JUMP_LAM_MAX = 0.25  # jump model: at most a jump every 4 trading days (identification)
+_JUMP_MU_MAX = 0.5  # jump model: |mean log jump| below 50%
 
 
 # --------------------------------------------------------------------------------------------
@@ -49,6 +52,11 @@ class GarchT:
     resid_std: np.ndarray  # standardised residuals (for correlation)
     dates: pd.DatetimeIndex
     cond_var: np.ndarray  # fitted conditional variance per day
+    kind: str = "garch_t"  # "garch_t" | "gjr_t" | "garch_jump" (see config.yaml model.variance)
+    gamma: float = 0.0  # GJR: extra ARCH effect after a price RISE (r > 0)
+    jump_lam: float = 0.0  # jump model: daily jump probability
+    jump_mu: float = 0.0  # jump model: mean log jump size
+    jump_sig: float = 0.0  # jump model: st.dev. of the log jump size
 
     @property
     def annual_vol_now(self) -> float:
@@ -58,7 +66,13 @@ class GarchT:
     @property
     def annual_vol_longrun(self) -> float:
         """Annualised long-run (unconditional) volatility."""
-        return float(np.sqrt(self.omega / max(1 - self.alpha - self.beta, _PERSISTENCE_FLOOR) * TRADING_DAYS_PER_YEAR))
+        persistence = self.alpha + self.gamma / 2 + self.beta
+        jump_var = self.jump_lam * (self.jump_mu**2 + self.jump_sig**2)
+        return float(
+            np.sqrt(
+                (self.omega + self.alpha * jump_var) / max(1 - persistence, _PERSISTENCE_FLOOR) * TRADING_DAYS_PER_YEAR
+            )
+        )
 
 
 def _garch_filter(r: np.ndarray, omega: float, alpha: float, beta: float, s0: float) -> np.ndarray:
@@ -117,6 +131,142 @@ def fit_garch_t(returns: pd.Series) -> GarchT:
 # --------------------------------------------------------------------------------------------
 # Power model: log(power) on log(gas) [+ log(co2)] + seasonality, AR(1) residual with t-errors
 # --------------------------------------------------------------------------------------------
+def _gjr_filter(r: np.ndarray, omega: float, alpha: float, gamma: float, beta: float, s0: float) -> np.ndarray:
+    """GJR-GARCH(1,1) variance: s2[t] = omega + (alpha + gamma * 1[r[t-1] > 0]) r[t-1]^2 + beta s2[t-1]."""
+    prev = np.concatenate([[0.0], r[:-1]])
+    x = omega + (alpha + gamma * (prev > 0)) * prev**2
+    x[0] = omega + alpha * s0
+    return signal.lfilter([1.0], [1.0, -beta], x, zi=[beta * s0])[0]
+
+
+def fit_gjr_t(returns: pd.Series) -> GarchT:
+    """GJR-GARCH(1,1)-t where price RISES raise volatility more (gamma >= 0 on r > 0), by maximum likelihood.
+
+    Stationarity: alpha + gamma/2 + beta < max_persistence (symmetric shocks)."""
+    r_raw = returns.dropna()
+    mu = float(r_raw.mean())
+    r = (r_raw - mu).values
+    v = r.var()
+
+    def nll(th: np.ndarray) -> float:
+        omega, alpha, gamma, beta, nu = th
+        if (
+            omega <= 0
+            or alpha < 0
+            or gamma < 0
+            or beta < 0
+            or alpha + gamma / 2 + beta >= GARCH_MAX_PERSISTENCE
+            or nu <= GARCH_NU_MIN
+            or nu > GARCH_NU_MAX
+        ):
+            return _INFEASIBLE
+        s2 = _gjr_filter(r, omega, alpha, gamma, beta, v)
+        if np.any(s2 <= 0):
+            return _INFEASIBLE
+        return -np.sum(_t_loglik(r, s2, nu))
+
+    best = None
+    for a0, b0, n0 in GARCH_START_VALUES:
+        x0 = [v * (1 - a0 - b0), a0 * 0.6, a0 * 0.8, b0, n0]
+        res = optimize.minimize(
+            nll,
+            x0,
+            method="Nelder-Mead",
+            options={"maxiter": GARCH_MAXITER, "xatol": GARCH_XATOL, "fatol": GARCH_FATOL},
+        )
+        if best is None or res.fun < best.fun:
+            best = res
+    assert best is not None
+    omega, alpha, gamma, beta, nu = best.x
+    s2 = _gjr_filter(r, omega, alpha, gamma, beta, v)
+    last_var = omega + (alpha + gamma * (r[-1] > 0)) * r[-1] ** 2 + beta * s2[-1]
+    return GarchT(
+        omega, alpha, beta, nu, mu, float(last_var), r / np.sqrt(s2), r_raw.index, s2, kind="gjr_t", gamma=float(gamma)
+    )
+
+
+def _norm_logpdf(x: np.ndarray, mean: float | np.ndarray, var: np.ndarray) -> np.ndarray:
+    return -0.5 * (np.log(2 * np.pi * var) + (x - mean) ** 2 / var)
+
+
+def fit_garch_jump(returns: pd.Series) -> GarchT:
+    """GARCH(1,1) with normal diffusion plus Poisson jumps (Merton-style), by maximum likelihood.
+
+    Daily return r = sqrt(s2) z + J,  z ~ N(0,1);  J = 0 with prob 1-lam, J ~ N(jump_mu, jump_sig^2) with prob lam.
+    The variance recursion uses the total return (jumps feed volatility). Fat tails come from the jumps."""
+    r_raw = returns.dropna()
+    mu = float(r_raw.mean())
+    r = (r_raw - mu).values
+    v = r.var()
+
+    def nll(th: np.ndarray) -> float:
+        omega, alpha, beta, lam, jmu, jsig = th
+        if (
+            omega <= 0
+            or alpha < 0
+            or beta < 0
+            or alpha + beta >= GARCH_MAX_PERSISTENCE
+            or not 0 < lam < _JUMP_LAM_MAX
+            or jsig <= 0
+            or abs(jmu) > _JUMP_MU_MAX
+        ):
+            return _INFEASIBLE
+        s2 = _garch_filter(r, omega, alpha, beta, v)
+        if np.any(s2 <= 0):
+            return _INFEASIBLE
+        ll = np.logaddexp(np.log1p(-lam) + _norm_logpdf(r, 0.0, s2), np.log(lam) + _norm_logpdf(r, jmu, s2 + jsig**2))
+        return -np.sum(ll)
+
+    best = None
+    sd = float(np.sqrt(v))
+    for a0, b0, _ in GARCH_START_VALUES:
+        for lam0 in (0.02, 0.06):
+            x0 = [v * (1 - a0 - b0) * 0.5, a0, b0, lam0, 0.0, 3 * sd]
+            res = optimize.minimize(
+                nll,
+                x0,
+                method="Nelder-Mead",
+                options={"maxiter": GARCH_MAXITER, "xatol": GARCH_XATOL, "fatol": GARCH_FATOL},
+            )
+            if best is None or res.fun < best.fun:
+                best = res
+    assert best is not None
+    omega, alpha, beta, lam, jmu, jsig = best.x
+    s2 = _garch_filter(r, omega, alpha, beta, v)
+    last_var = omega + alpha * r[-1] ** 2 + beta * s2[-1]
+    total_sd = np.sqrt(s2 + lam * (jmu**2 + jsig**2))
+    return GarchT(
+        omega,
+        alpha,
+        beta,
+        np.inf,
+        mu,
+        float(last_var),
+        r / total_sd,
+        r_raw.index,
+        s2,
+        kind="garch_jump",
+        jump_lam=float(lam),
+        jump_mu=float(jmu),
+        jump_sig=float(jsig),
+    )
+
+
+_LABEL = {"garch_t": "GARCH-t", "gjr_t": "GJR-GARCH-t", "garch_jump": "GARCH-jump"}
+
+
+def _extra(g: GarchT) -> str:
+    """Variant-specific parameters for describe() (empty for the default GARCH-t)."""
+    if g.kind == "gjr_t":
+        return f" gamma={g.gamma:.3f}"
+    if g.kind == "garch_jump":
+        return f" jumps p={g.jump_lam:.3f} mu={g.jump_mu:+.3f} sd={g.jump_sig:.3f}"
+    return ""
+
+
+FITTERS = {"garch_t": fit_garch_t, "gjr_t": fit_gjr_t, "garch_jump": fit_garch_jump}
+
+
 def _power_design(dates: pd.DatetimeIndex, log_drivers: dict[str, np.ndarray]) -> np.ndarray:
     doy = np.asarray(dates.day_of_year)
     cols = [np.ones(len(dates))]
@@ -186,8 +336,10 @@ class FittedModel:
     history: pd.DataFrame  # data up to as_of
 
 
-def fit(df: pd.DataFrame, as_of: DateLike | None = None) -> FittedModel:
-    """Fit all price models using only data up to `as_of` (default: the last date in `df`)."""
+def fit(df: pd.DataFrame, as_of: DateLike | None = None, variance: str | None = None) -> FittedModel:
+    """Fit all price models using only data up to `as_of` (default: the last date in `df`).
+
+    variance: "garch_t" (default, config.yaml model.variance), "gjr_t" or "garch_jump" for gas / CO2."""
     as_of = pd.Timestamp(as_of) if as_of is not None else df.index.max()
     h = df.loc[:as_of]
     if len(h) < MIN_HISTORY_DAYS:
@@ -198,7 +350,7 @@ def fit(df: pd.DataFrame, as_of: DateLike | None = None) -> FittedModel:
     garch = {}
     for k in drivers:
         trade = h[h[f"{k}_trade"]][k] if f"{k}_trade" in h else h[k]
-        garch[k] = fit_garch_t(np.log(trade).diff())
+        garch[k] = FITTERS[variance or MODEL_VARIANCE](np.log(trade).diff())
     pm = fit_power(h, drivers)
     # correlation of shocks on common dates
     shocks = pd.DataFrame({k: pd.Series(garch[k].resid_std, index=garch[k].dates) for k in drivers})
@@ -224,7 +376,7 @@ def describe(m: FittedModel) -> str:
     for k in m.drivers:
         g = m.garch[k]
         lines.append(
-            f"  {k:5s} GARCH-t: alpha={g.alpha:.3f} beta={g.beta:.3f} nu={g.nu:.1f} | "
+            f"  {k:5s} {_LABEL[g.kind]}: alpha={g.alpha:.3f} beta={g.beta:.3f} nu={g.nu:.1f}{_extra(g)} | "
             f"vol now {g.annual_vol_now:.0%}/yr, long-run {g.annual_vol_longrun:.0%}/yr | "
             f"last price {m.last[k]:.1f}"
         )

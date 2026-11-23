@@ -31,6 +31,10 @@ FORWARD_PREMIUM = _C["fixed_price"]["premium"]
 FORWARD_LOOKBACK_DAYS = _C["fixed_price"]["lookback_days"]
 ANCHOR_TO_FORWARD = _C["fixed_price"]["anchor_to_forward"]
 
+# volatility model choice (validated out of sample, see validation.py)
+MODEL_VARIANCE = _C["model"]["variance"]
+VALIDATION = _C["validation"]
+
 # GARCH(1,1)-t
 GARCH_START_VALUES = [tuple(v) for v in _C["garch"]["start_values"]]
 GARCH_MAX_PERSISTENCE = _C["garch"]["max_persistence"]
