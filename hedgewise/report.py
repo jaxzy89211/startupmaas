@@ -14,7 +14,6 @@ from __future__ import annotations
 import argparse
 import io
 import json
-import re
 from pathlib import Path
 
 import numpy as np
@@ -29,7 +28,8 @@ from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Tabl
 
 import hedgewise as hw
 from hedgewise import provenance
-from hedgewise._types import DateLike, PathOrBuffer
+from hedgewise._types import PathOrBuffer
+from hedgewise.naming import report_path  # re-exported: report.report_path() keeps working
 from hedgewise.settings import DEFAULT_PATHS, DEFAULT_RISK_AVERSION, DEFAULT_SEED
 
 # ---- Fonts: embed DejaVu Sans (ships with matplotlib, no download). The built-in Helvetica has no glyph for "³"
@@ -396,12 +396,6 @@ def make_report(
 def _esc(s: str) -> str:
     """Escape &, <, > for reportlab paragraphs."""
     return s.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-
-
-def report_path(company_name: str, as_of: DateLike) -> Path:
-    """output/report_<company-slug>_<as-of date>.pdf"""
-    slug = re.sub(r"[^a-z0-9]+", "_", company_name.lower()).strip("_") or "company"
-    return hw.OUT / f"report_{slug}_{pd.Timestamp(as_of):%Y-%m-%d}.pdf"
 
 
 def main(argv: list[str] | None = None) -> Path:

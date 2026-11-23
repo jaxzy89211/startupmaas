@@ -4,7 +4,7 @@ pandas>=2.2
 numpy>=1.26
 scipy>=1.11
 matplotlib>=3.8
-streamlit>=1.50        # width="stretch" on st.image / st.dataframe
+streamlit>=1.67        # deferred download (callable data), width="stretch"
 reportlab>=4.0         # PDF report
 openpyxl>=3.1          # Excel uploads
 pyyaml>=6.0            # config.yaml

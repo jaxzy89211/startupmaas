@@ -11,7 +11,7 @@ import streamlit as st
 
 import hedgewise as hw
 from hedgewise import company_input as ci
-from hedgewise import report
+from hedgewise.naming import report_path
 from hedgewise.settings import APP, DEFAULT_RISK_AVERSION, DEFAULT_SEED
 
 st.set_page_config(page_title="HedgeWise", page_icon="⚡", layout="wide")
@@ -27,6 +27,32 @@ def load() -> pd.DataFrame:
 def fitted(as_of: str) -> hw.FittedModel:
     """Model fitted on data up to as_of (cached)."""
     return hw.fit(load(), as_of)
+
+
+@st.cache_data(show_spinner=False, max_entries=64)
+def analysis_png(key: tuple, _a: hw.Analysis) -> bytes:
+    """The 4-panel analysis chart as PNG bytes, cached per input combination (`key`; `_a` is not hashed)."""
+    buf = io.BytesIO()  # in memory: no shared file when several people use the demo at once
+    hw.plot_analysis(_a, buf)
+    return buf.getvalue()
+
+
+@st.cache_data(show_spinner=False, max_entries=64)
+def stress_png(key: tuple, _stress: dict) -> bytes:
+    """The stress-scenario chart as PNG bytes, cached per input combination."""
+    buf = io.BytesIO()
+    hw.plot_stress(_stress, buf)
+    return buf.getvalue()
+
+
+def report_pdf(a: hw.Analysis, lang: str, stress: dict | None) -> bytes:
+    """The one-page PDF. Called only when someone clicks "Download" (Streamlit runs it on a separate thread,
+    outside the page script, so no Streamlit calls or caches in here); reportlab is imported only then."""
+    from hedgewise import report
+
+    buf = io.BytesIO()
+    report.make_report(a, buf, lang, stress=stress)
+    return buf.getvalue()
 
 
 @st.cache_resource(show_spinner=False)
@@ -163,6 +189,8 @@ with st.spinner("Fitting GARCH-t model and simulating price scenarios ..."):
     m = fitted(as_of)
     s = sims(as_of, ds, n, DEFAULT_SEED)
     a = hw.analyse(m, company, ds, n, DEFAULT_SEED, lam, sims=s, allow_timing=allow_timing, budget=budget)
+# everything that changes the analysis: used as the cache key for the charts and the PDF
+key = (as_of, ds, n, lam, budget, allow_timing, company.name, company.gas_m3, company.power_kwh, company.solar_kwp)
 
 var_row, hw_row = a.table.loc["All variable"], a.table.iloc[-1]
 try:
@@ -185,30 +213,21 @@ st.info(hw.recommendation_text(a).replace("\n", "  \n"))
 
 rc1, rc2, _ = st.columns([1, 2, 3])
 rep_lang = rc1.radio("Report language", ["EN", "NL"], horizontal=True)
-pdf = io.BytesIO()
-try:
-    report.make_report(a, pdf, rep_lang.lower(), stress=stress)
-    rc2.download_button(
-        "Download report (PDF)",
-        pdf.getvalue(),
-        type="primary",
-        file_name=report.report_path(company.name, m.as_of).name,
-        mime="application/pdf",
-    )
-except Exception as e:  # noqa: BLE001  (never let the report break the demo)
-    rc2.error(f"Report could not be made: {e}")
+rc2.download_button(
+    "Download report (PDF)",
+    lambda: report_pdf(a, rep_lang.lower(), stress),  # built on click, not on every rerun
+    type="primary",
+    file_name=report_path(company.name, m.as_of).name,
+    mime="application/pdf",
+)
 
-buf = io.BytesIO()  # in memory: no shared file when several people use the demo at once
-hw.plot_analysis(a, buf)
-st.image(buf.getvalue(), width="stretch")
+st.image(analysis_png(key, a), width="stretch")
 st.caption("Bottom left, the trade-off chart: " + hw.frontier_scale_sentence(a, "en"))
 
 if stress:
     st.subheader("What if 2022 happens again?")
-    sbuf = io.BytesIO()
-    hw.plot_stress(stress, sbuf)
     sc1, sc2 = st.columns([3, 2])
-    sc1.image(sbuf.getvalue(), width="stretch")
+    sc1.image(stress_png(key, stress), width="stretch")
     for sc in stress["scenarios"]:
         b, p = sc["bills"], sc["avg_price"]
         sc2.markdown(
