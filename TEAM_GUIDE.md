@@ -72,7 +72,7 @@ Click **Vergelijk met de strategieën** (about a minute the first time). You get
 | **Slecht scenario / Bad case** | The average of the worst 5% of those paths ("expected shortfall"). Not the worst case; a plausible bad year. |
 | **Slecht scenario met HedgeWise** | The same bad case if they follow our plan (fix the advised share in monthly steps). The green number is how much the plan takes off. |
 | **Advies: deel vastzetten / Share to fix** | Share of next year's volume to fix now, spread over the remaining monthly buying dates before January. |
-| **The trade-off chart** | Every share from 0% to 100%: right = bigger bad case, up = dearer on average. Fixing more always costs a little more on average (the ~5% premium inside fixed prices) and removes some of the bad case. The star is our advice. |
+| **The trade-off chart** | Every share from 0% to 100%: right = bigger bad case, up = dearer on average. In the model, fixing more costs a little more on average (the ~5% premium inside fixed prices) and removes some of the bad case. The star is our advice. |
 | **Wat als 2022 zich herhaalt?** | Two historical stress tests, not forecasts: the 2022 prices exactly, and a shock as big as 2021→2022 starting from today's prices. |
 | **Past contracts table** | What they actually paid per year (commodity only) next to what 5 simple strategies would have cost with the same volumes and the real prices. |
 

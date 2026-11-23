@@ -91,7 +91,7 @@ below works as before. When imported (`import backtest`, `import hedgewise_model
 | `hedgewise_model.py`, `backtest.py`, `report.py`, `company_input.py`, `forwards.py` | Thin wrappers (commands unchanged) |
 | `app.py` | Streamlit dashboard for the live demo |
 | `download_data.py` | Refresh power (Energy-Charts / ENTSO-E) and gas (Yahoo `TTF=F`) prices |
-| `tests/` | 97 tests incl. `test_golden.py` (backtest totals must match `golden_backtest.json` to within €1) and a dashboard smoke test |
+| `tests/` | 148 tests incl. `test_golden.py` (backtest totals must match `golden_backtest.json` to within €1) and a dashboard smoke test |
 | `requirements.txt` / `requirements-dev.txt` / `requirements.lock` | Minimum versions / + test tools / exact versions that produced the committed results |
 | `.github/workflows/ci.yml` | Ruff (lint + format) and pytest on Python 3.11 and 3.12, on every push |
 | `data/company_example.csv` | Template for pilot data (month, gas_m3, power_kwh) |
@@ -175,4 +175,5 @@ python backtest.py --company data/pilot_x.csv
 * The backtest decisions only use `df.loc[:decision_date]` (see `backtest.run_year`).
 * v0.3: with anchoring, "Fix 100% now" costs exactly 1.05 × the expected all-variable bill, and tranches cost the same as fixing now in expectation (checked at 3 dates).
 * v0.3: risk aversion 0.3 / 0.5 / 0.8 → 40% / 70% / 85% fixed as of 30 Jun 2021 (single ratio, 4,000 scenarios).
+* v0.7: a fresh clone (install from `requirements.lock`, ruff, 147 tests, backtest, validation, a small robustness run, the app, PDFs in EN and NL) reproduced the committed backtest and validation outputs byte for byte (23 Nov 2026).
 * Still to do: a teammate who didn't build the model reruns `python backtest.py` and gets the same numbers.

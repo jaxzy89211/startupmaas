@@ -100,7 +100,7 @@ Per year: 729 / 1,584 / 1,612 / 1,894 / 893. The ladder fixed 48%, 50%, 60%, 65%
 | 30 Jun 2022 | 2023 | €2.31m | €7.96m | 90% | €4.28m | €104k |
 | 23 Nov 2026 (today) | 2027 | €2.02m | €4.82m | 55% | €3.34m | €56k |
 
-Today's frontier: each extra 10% fixed costs about €10k on average and removes about €260k from the bad case. The exact recommended share moves by ±5 percentage points with the number of scenarios (2,000 in the dashboard vs 10,000 here).
+Today's frontier: each extra 10% fixed costs about €10k on average and removes about €260k from the bad case. The exact recommended share moves by ±5 percentage points with the number of scenarios (5,000 in the dashboard, which advises 60% today, vs 10,000 here).
 
 ## Stress test: "what if 2022 happens again?" (two scenarios, revised)
 
