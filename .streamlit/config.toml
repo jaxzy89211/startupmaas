@@ -1,0 +1,18 @@
+# HedgeWise look & feel (Streamlit Community Cloud reads this file from the repo)
+[theme]
+base = "light"
+primaryColor = "#1b9e5a"              # HedgeWise green (buttons, sliders, highlights)
+backgroundColor = "#ffffff"
+secondaryBackgroundColor = "#f3f6f4"  # sidebar and input fields
+textColor = "#1f2937"
+font = "sans serif"
+
+[client]
+toolbarMode = "minimal"               # hide developer menu items for visitors
+
+[server]
+headless = true
+runOnSave = false
+
+[browser]
+gatherUsageStats = false

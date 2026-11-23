@@ -36,7 +36,8 @@ def sims(as_of: str, delivery_start: str, n: int, seed: int):
 df = load()
 st.title("⚡ HedgeWise")
 st.caption("How bad can next year's energy bill get, and how much should you fix? "
-           f"Prices: Dutch day-ahead power + TTF gas up to {df.index.max():%d %b %Y}.")
+           f"Prices: Dutch day-ahead power + TTF gas up to {df.index.max():%d %b %Y}. "
+           "Power data: Energy-Charts (CC BY 4.0, Bundesnetzagentur | SMARD.de).")
 
 with st.sidebar:
     st.header("Your company")

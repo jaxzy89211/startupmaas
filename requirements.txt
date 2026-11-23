@@ -1,7 +1,12 @@
+# Runtime dependencies for the HedgeWise model, dashboard (app.py) and PDF report.
+# Minimum versions are the oldest we expect to work; tested with pandas 3.0, numpy 2.x, streamlit 1.67.
 pandas>=2.2
 numpy>=1.26
 scipy>=1.11
 matplotlib>=3.8
-yfinance>=0.2.40
+streamlit>=1.50        # width="stretch" on st.image / st.dataframe
+reportlab>=4.0         # PDF report
+openpyxl>=3.1          # Excel uploads
+# only needed for download_data.py (refreshing prices), not for the dashboard:
 requests>=2.31
-streamlit>=1.35
+yfinance>=0.2.40

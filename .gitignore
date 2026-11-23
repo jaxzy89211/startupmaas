@@ -6,3 +6,7 @@ backup_v02/
 hedgewise_v0.3.zip
 output/_*
 .pytest_cache/
+.streamlit/secrets.toml
+# Real forward prices (Refinitiv/Bloomberg/EEX) are licensed: never commit or deploy them by accident.
+data/forwards.csv
+data/forwards.xlsx
