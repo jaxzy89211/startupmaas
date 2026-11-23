@@ -118,3 +118,36 @@ def test_sentences_and_report(analysis, tmp_path):
         report.make_report(analysis, str(tmp_path / f"g_{lang}.pdf"), lang, stress, green=t)  # still one page
     hw.plot_frontier(analysis, path=tmp_path / "f.png", extra_points=[("x", 2e6, 1e6)])
     assert (tmp_path / "f.png").stat().st_size > 10_000
+
+
+def test_no_look_ahead_in_hourly_shapes():
+    """A historical decision date must only see hourly price shapes up to that date: corrupting every hour after
+    it leaves the shapes identical."""
+    h = gr.load_hourly()
+    as_of = "2022-06-30"
+    clean = gr.day_shapes(h, as_of=as_of)
+    bad = h.copy()
+    bad[bad.index >= pd.Timestamp("2022-07-01")] = 1e6
+    corrupt = gr.day_shapes(bad, as_of=as_of)
+    for m in range(1, 13):
+        assert np.array_equal(clean[m], corrupt[m])
+    # and evaluate() on a 2021 analysis uses only data up to its as-of date
+    df = hw.load_prices()
+    a = hw.analyse(hw.fit(df, "2021-06-30"), hw.Company(), None, 500, 1, 0.5)
+    t, arr = gr.evaluate(a, gr.Investments(solar_kwp=500))
+    sh = gr.default_shapes("2021-06-30")
+    assert np.allclose(arr["effects"][0].delta_mwh_eq, gr.solar_effect(a.company, 500, sh, 2022).delta_mwh_eq)
+
+
+def test_leap_year_days():
+    c = hw.Company()
+    feb28, feb29 = gr.load_profile(c, 2, 2027), gr.load_profile(c, 2, 2028)
+    assert feb28.sum() * 28 == pytest.approx(feb29.sum() * 29)  # same monthly volume, spread over 28 or 29 days
+
+
+def test_pdf_is_byte_identical_when_rebuilt(analysis, tmp_path):
+    from hedgewise import report
+
+    for name in ("a.pdf", "b.pdf"):
+        report.make_report(analysis, str(tmp_path / name), "nl", today=pd.Timestamp("2026-11-23"))
+    assert (tmp_path / "a.pdf").read_bytes() == (tmp_path / "b.pdf").read_bytes()

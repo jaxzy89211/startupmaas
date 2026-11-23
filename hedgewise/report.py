@@ -31,6 +31,7 @@ from hedgewise import provenance
 from hedgewise._types import PathOrBuffer
 from hedgewise.naming import report_path  # re-exported: report.report_path() keeps working
 from hedgewise.settings import DEFAULT_PATHS, DEFAULT_RISK_AVERSION, DEFAULT_SEED
+from hedgewise.texts import NL_MONTHS, TEXT, _num, money, pct  # noqa: F401 (re-exported: report.TEXT etc.)
 
 # ---- Fonts: embed DejaVu Sans (ships with matplotlib, no download). The built-in Helvetica has no glyph for "³"
 # (m³ rendered as "m "), and an embedded TTF also looks the same in every PDF viewer.
@@ -72,8 +73,6 @@ INK = colors.HexColor("#1f2937")
 MUTED = colors.HexColor("#6b7280")
 SOFT = colors.HexColor("#eef7f1")
 RED_SOFT = colors.HexColor("#fdf0ee")
-
-from .texts import NL_MONTHS, TEXT, _num, money, pct  # noqa: E402,F401 (re-exported)
 
 
 def date_str(d: pd.Timestamp, lang: str) -> str:
@@ -289,6 +288,7 @@ def make_report(
         initialFontName=FONT,
         subject="HedgeWise provenance: " + json.dumps(provenance.current()),
         author="HedgeWise",
+        invariant=True,  # no creation timestamp or random ID: same inputs -> byte-identical PDF
     )
     doc.build(story, onFirstPage=_page, onLaterPages=_page)
     pages = 1 if audit is None else 2

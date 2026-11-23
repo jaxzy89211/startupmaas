@@ -1,7 +1,7 @@
 Company: Limburg food processor (hypothetical) | gas 1,200,000 m3/yr (11,723 MWh), power 5,000 MWh/yr
 
   2021: decision 2020-06-30 fitted+simulated in 1s | fixed price gas 5.6, power 26.2
-  2021: decision 2020-07-31 fitted+simulated in 0s | fixed price gas 5.6, power 28.5
+  2021: decision 2020-07-31 fitted+simulated in 1s | fixed price gas 5.6, power 28.5
   2021: decision 2020-08-31 fitted+simulated in 0s | fixed price gas 8.7, power 32.9
   2021: decision 2020-09-30 fitted+simulated in 0s | fixed price gas 12.0, power 41.0
   2021: decision 2020-10-31 fitted+simulated in 0s | fixed price gas 14.9, power 37.5
@@ -24,12 +24,12 @@ Company: Limburg food processor (hypothetical) | gas 1,200,000 m3/yr (11,723 MWh
   2024: decision 2023-09-30 fitted+simulated in 0s | fixed price gas 38.9, power 108.0
   2024: decision 2023-10-31 fitted+simulated in 0s | fixed price gas 49.8, power 101.8
   2024: decision 2023-11-30 fitted+simulated in 0s | fixed price gas 48.3, power 107.6
-  2025: decision 2024-06-30 fitted+simulated in 0s | fixed price gas 36.1, power 68.0
-  2025: decision 2024-07-31 fitted+simulated in 0s | fixed price gas 34.1, power 67.2
-  2025: decision 2024-08-31 fitted+simulated in 1s | fixed price gas 40.4, power 83.2
-  2025: decision 2024-09-30 fitted+simulated in 1s | fixed price gas 38.2, power 84.7
-  2025: decision 2024-10-31 fitted+simulated in 1s | fixed price gas 42.6, power 94.3
-  2025: decision 2024-11-30 fitted+simulated in 1s | fixed price gas 46.8, power 118.8
+  2025: decision 2024-06-30 fitted+simulated in 1s | fixed price gas 36.1, power 68.0
+  2025: decision 2024-07-31 fitted+simulated in 1s | fixed price gas 34.1, power 67.2
+  2025: decision 2024-08-31 fitted+simulated in 0s | fixed price gas 40.4, power 83.2
+  2025: decision 2024-09-30 fitted+simulated in 0s | fixed price gas 38.2, power 84.7
+  2025: decision 2024-10-31 fitted+simulated in 0s | fixed price gas 42.6, power 94.3
+  2025: decision 2024-11-30 fitted+simulated in 0s | fixed price gas 46.8, power 118.8
 Provenance: config 9cbfbda9d6dc · data 8181ab654204 (2019-01-02..2026-11-23) · v0.7.0
 
 Fixed prices: 0 from real forwards (no data/forwards.csv), 120 from the proxy (30-day spot + 5%).

@@ -256,6 +256,7 @@ COLORS = {
 
 def plot_robustness(summary: pd.DataFrame, per: pd.DataFrame, path: str) -> None:
     """Cost vs risk: one dot per strategy (median 8-year total vs median worst year), 5-95% whiskers both ways."""
+    per = per[per.strategy != FAILED]
     import matplotlib
 
     matplotlib.use("Agg")

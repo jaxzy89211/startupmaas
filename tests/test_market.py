@@ -3,6 +3,7 @@
 import sys
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
@@ -68,3 +69,14 @@ def test_cli_offline(tmp_path, monkeypatch):
     monkeypatch.setattr(mk, "OUT", tmp_path)
     mk.main(["--offline"])
     assert (tmp_path / "market.png").stat().st_size > 20_000 and (tmp_path / "market_summary.csv").exists()
+
+
+def test_online_fetch_writes_the_snapshot(tmp_path, monkeypatch):
+    rows = pd.DataFrame([{"ID": 1, "BedrijfstakkenBranchesSBI2008": "317100  ", "Perioden": "2026KW03"}])
+    monkeypatch.setattr(mk, "CBS", tmp_path)
+    monkeypatch.setattr(mk, "_odata", lambda table, flt: rows.copy())
+    df, src = mk.fetch("81589NED", "x")
+    assert src.startswith("CBS API") and df.BedrijfstakkenBranchesSBI2008.iloc[0] == "317100"  # padding stripped
+    assert (tmp_path / "81589NED.csv").exists()
+    monkeypatch.setitem(mk._PADDED, ("T", "D"), {"317100": "317100  "})
+    assert mk._or("D", ["317100"], "T") == "(D eq '317100  ')"

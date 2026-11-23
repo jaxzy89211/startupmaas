@@ -55,10 +55,16 @@ def load_hourly(path: Path = DATA / "power_nl_hourly.csv") -> pd.Series:
     return s.groupby(s.index.floor("h")).mean()
 
 
-def day_shapes(hourly: pd.Series, lookback_months: int = _G["hourly_shape"]["lookback_months"]) -> dict:
+def day_shapes(
+    hourly: pd.Series, lookback_months: int = _G["hourly_shape"]["lookback_months"], as_of: object = None
+) -> dict:
     """{calendar month 1-12: array (n_days, 24)} of hourly price / that month's average price, from the last
-    `lookback_months` complete months. DST days: the missing hour is interpolated, the doubled hour averaged."""
-    end = hourly.index.max().to_period("M") - 1  # last complete month
+    `lookback_months` complete months up to `as_of` (default: all data). No data after `as_of` is used, so a
+    historical decision date never sees later price shapes. DST days: the missing hour is interpolated, the
+    doubled hour averaged."""
+    if as_of is not None:
+        hourly = hourly[hourly.index < pd.Timestamp(as_of).normalize() + pd.Timedelta(days=1)]
+    end = (hourly.index.max() + pd.Timedelta(hours=1)).to_period("M") - 1  # last complete month
     start = end - lookback_months + 1
     h = hourly[(hourly.index.to_period("M") >= start) & (hourly.index.to_period("M") <= end)]
     month_mean = h.groupby(h.index.to_period("M")).transform("mean")
@@ -66,13 +72,22 @@ def day_shapes(hourly: pd.Series, lookback_months: int = _G["hourly_shape"]["loo
     r["day"], r["hour"] = r.index.normalize(), r.index.hour
     grid = r.pivot_table(index="day", columns="hour", values="r", aggfunc="mean").reindex(columns=range(HOURS))
     grid = grid.interpolate(axis=1, limit_direction="both")
-    return {m: grid[grid.index.month == m].to_numpy() for m in range(1, 13)}
+    out = {m: grid[grid.index.month == m].to_numpy() for m in range(1, 13)}
+    missing = [m for m, v in out.items() if not len(v)]
+    if missing:
+        raise ValueError(f"not enough hourly data before {as_of} for calendar months {missing}")
+    return out
 
 
 @lru_cache(maxsize=1)
-def default_shapes() -> dict:
-    """Day shapes from data/power_nl_hourly.csv (cached)."""
-    return day_shapes(load_hourly())
+def _hourly() -> pd.Series:
+    return load_hourly()
+
+
+@lru_cache(maxsize=16)
+def default_shapes(as_of: str | None = None) -> dict:
+    """Day shapes from data/power_nl_hourly.csv up to `as_of` (cached per date)."""
+    return day_shapes(_hourly(), as_of=as_of)
 
 
 def simulate_hourly(level: float, month: int, n_days: int, seed: int = 0, shapes: dict | None = None) -> np.ndarray:
@@ -85,13 +100,13 @@ def simulate_hourly(level: float, month: int, n_days: int, seed: int = 0, shapes
 # --------------------------------------------------------------------------------------------
 # Typical-day volume profiles (MWh per hour)
 # --------------------------------------------------------------------------------------------
-def _days(month: int, year: int = 2027) -> int:
+def _days(month: int, year: int = 2027) -> int:  # year: the delivery year (leap years)
     return pd.Period(f"{year}-{month:02d}").days_in_month
 
 
-def load_profile(company: Company, month: int) -> np.ndarray:
+def load_profile(company: Company, month: int, year: int = 2027) -> np.ndarray:
     """The company's power use on a typical day of `month`, MWh per hour (config: green.load_profile)."""
-    day = float(np.asarray(company.power_kwh, float)[month - 1]) / KWH_PER_MWH / _days(month)
+    day = float(np.asarray(company.power_kwh, float)[month - 1]) / KWH_PER_MWH / _days(month, year)
     if _G["load_profile"] == "daytime":
         w = np.where(
             (np.arange(HOURS) >= 7) & (np.arange(HOURS) < 19), _G["daytime_share"] / 12, (1 - _G["daytime_share"]) / 12
@@ -101,14 +116,14 @@ def load_profile(company: Company, month: int) -> np.ndarray:
     return day * w
 
 
-def solar_profile(kwp: float, month: int) -> np.ndarray:
+def solar_profile(kwp: float, month: int, year: int = 2027) -> np.ndarray:
     """Rooftop-PV production on a typical day of `month`, MWh per hour: the month's yield (config solar.*) spread
     as a sine over the production window (config green.solar.sun_hours_cet)."""
     month_mwh = kwp * SOLAR_YIELD_KWH_PER_KWP / KWH_PER_MWH * SOLAR_SHARE[month - 1] / SOLAR_SHARE.sum()
     a, b = _G["solar"]["sun_hours_cet"][month - 1]
     mid = np.arange(HOURS) + 0.5
     w = np.where((mid > a) & (mid < b), np.sin(np.pi * (mid - a) / (b - a)), 0.0)
-    return month_mwh / _days(month) * w / w.sum()
+    return month_mwh / _days(month, year) * w / w.sum()
 
 
 def annuity(capex: float, years: int, rate: float = _G["annuity_rate"]) -> float:
@@ -149,16 +164,16 @@ class Effect:
     details: dict
 
 
-def solar_effect(company: Company, kwp: float, shapes: dict) -> Effect:
+def solar_effect(company: Company, kwp: float, shapes: dict, year: int = 2027) -> Effect:
     """Self-consumption and export of `kwp` of rooftop PV."""
     c = _G["solar"]
     delta, self_mwh, export_mwh = np.zeros(12), 0.0, 0.0
     for m in range(1, 13):
         r = shapes[m].mean(axis=0)  # expected price shape of a day in this month
-        pv, load = solar_profile(kwp, m), load_profile(company, m)
+        pv, load = solar_profile(kwp, m, year), load_profile(company, m, year)
         own = np.minimum(pv, load)
         exp = pv - own
-        d = _days(m)
+        d = _days(m, year)
         delta[m - 1] = -d * (own @ r + c["export_value_share"] * (exp @ r))
         self_mwh, export_mwh = self_mwh + d * own.sum(), export_mwh + d * exp.sum()
     capex = kwp * c["capex_eur_per_kwp"]
@@ -195,15 +210,15 @@ def battery_day_value(r: np.ndarray, load: np.ndarray, kwh: float, kw: float) ->
     return np.maximum(gain.sum(axis=1) - cost, 0.0)
 
 
-def battery_effect(company: Company, kwh: float, kw: float | None, shapes: dict) -> Effect:
+def battery_effect(company: Company, kwh: float, kw: float | None, shapes: dict, year: int = 2027) -> Effect:
     """Daily arbitrage (price-dependent) + peak shaving (fixed) of a battery."""
     b = _G["battery"]
     kw = kw or kwh / 2
     delta, cycles = np.zeros(12), 0
     for m in range(1, 13):
-        v = battery_day_value(shapes[m], load_profile(company, m), kwh, kw)
-        delta[m - 1] = -_days(m) * b["cycles_per_day"] * v.mean()
-        cycles += _days(m) * (v > 0).mean()
+        v = battery_day_value(shapes[m], load_profile(company, m, year), kwh, kw)
+        delta[m - 1] = -_days(m, year) * b["cycles_per_day"] * v.mean()
+        cycles += _days(m, year) * (v > 0).mean()
     capex = kwh * b["capex_eur_per_kwh"]
     opex = capex * b["opex_pct_of_capex"] / PERCENT
     peak = kw * b["peak_tariff_eur_per_kw_year"] * b["peak_shaving_share"]
@@ -219,11 +234,11 @@ def battery_effect(company: Company, kwh: float, kw: float | None, shapes: dict)
     )
 
 
-def ppa_effect(company: Company, share: float, price: float, years: int, shapes: dict) -> Effect:
+def ppa_effect(company: Company, share: float, price: float, years: int, shapes: dict, year: int = 2027) -> Effect:
     """A PPA for `share` of the yearly power volume at `price`, shaped like the load."""
     delta = np.zeros(12)
     for m in range(1, 13):
-        delta[m - 1] = -share * _days(m) * (load_profile(company, m) @ shapes[m].mean(axis=0))
+        delta[m - 1] = -share * _days(m, year) * (load_profile(company, m, year) @ shapes[m].mean(axis=0))
     vol = share * float(np.asarray(company.power_kwh, float).sum()) / KWH_PER_MWH
     return Effect(
         "ppa",
@@ -236,19 +251,21 @@ def ppa_effect(company: Company, share: float, price: float, years: int, shapes:
     )
 
 
-def effects(company: Company, inv: Investments, power_fixed_price: float, shapes: dict | None = None) -> list[Effect]:
+def effects(
+    company: Company, inv: Investments, power_fixed_price: float, shapes: dict | None = None, year: int = 2027
+) -> list[Effect]:
     """The selected investments' effects (one each)."""
     if company.solar_kwp:
         raise ValueError("Company.solar_kwp is the simple solar model; set it to 0 and use Investments.solar_kwp")
     sh = shapes or default_shapes()
     out = []
     if inv.solar_kwp:
-        out.append(solar_effect(company, inv.solar_kwp, sh))
+        out.append(solar_effect(company, inv.solar_kwp, sh, year))
     if inv.battery_kwh:
-        out.append(battery_effect(company, inv.battery_kwh, inv.battery_kw, sh))
+        out.append(battery_effect(company, inv.battery_kwh, inv.battery_kw, sh, year))
     if inv.ppa_share:
         price = power_fixed_price if inv.ppa_price is None else inv.ppa_price
-        out.append(ppa_effect(company, inv.ppa_share, price, inv.ppa_years, sh))
+        out.append(ppa_effect(company, inv.ppa_share, price, inv.ppa_years, sh, year))
     return out
 
 
@@ -277,7 +294,9 @@ def evaluate(a: object, inv: Investments, shapes: dict | None = None) -> tuple[p
     q = np.quantile(base, 0.95)
     bad = base >= q
     es0 = float(base[bad].mean())
-    effs = effects(a.company, inv, a.fwd_now["power"], shapes)
+    # price shapes only from data up to the decision date (no look-ahead); day counts of the delivery year
+    sh = shapes or default_shapes(str(a.model.as_of.date()))
+    effs = effects(a.company, inv, a.fwd_now["power"], sh, a.delivery_start.year)
     rows, arrays = [], {}
     combos = [(e.label, [e]) for e in effs]
     if len(effs) > 1:

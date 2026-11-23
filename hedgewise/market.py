@@ -290,7 +290,7 @@ def main(argv: list[str] | None = None) -> pd.DataFrame:
         .round(2)
         .to_string(index=False)
     )
-    print("\n" + (summ.T / 1).round(0).to_string())
+    print("\n" + summ.T.round(0).to_string())
     print("Provenance: " + one_line())
     return summ
 
