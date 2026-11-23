@@ -166,6 +166,54 @@ available at the time. Outside the 2021–22 crisis, our 90% bands held 90–92%
 crisis, no statistical model could see it coming: ours held 36–40%. That's why HedgeWise always shows a '2022
 happens again' stress test next to the model."
 
+## Green investments as a hedge (new in v0.7)
+
+`hedgewise/green.py`; app section "Green investments" (sidebar inputs); `report.py --green-solar-kwp 1000
+--green-battery-kwh 1000 --green-ppa-share 0.4` adds one line to the PDF. **Every assumption is in `config.yaml`
+(section `green`) with a source or an "ASSUMPTION" note; capex numbers are placeholders until we have real quotes.**
+
+**Method.** The monthly price model is unchanged. Inside each simulated month, hourly power prices = the simulated
+monthly level × a real day profile of that calendar month (hour price / month average, last 36 months of
+`data/power_nl_hourly.csv`, local time, 15-minute data averaged per hour). Each investment changes the bill by
+Σ_month level × Δ(MWh at the monthly price) + a fixed yearly amount (capital annuity at 5% + upkeep − peak shaving, or
+the PPA payments), so it can be added to any hedge plan on the same 10,000 scenarios. Investments are shown on top
+of the HedgeWise plan (55% fixed today) and as extra points on the trade-off chart.
+
+**Today (as of 23 Nov 2026, delivery 2027), the default food processor, €k per year:**
+
+| On top of the HedgeWise plan | Capex | Expected bill lower by | Bad case lower by | Saving, normal | Saving, crisis | Payback normal (yrs) | Payback crisis (yrs) |
+|---|---|---|---|---|---|---|---|
+| + solar 1 MWp | 650 | 46 | 154 | 92 | 201 | 7.0 | 3.2 |
+| + battery 1 MWh (500 kW) | 350 | 51 | 134 | 84 | 168 | 4.2 | 2.1 |
+| + PPA 40% at today's fixed price | 0 | −19 | 386 | −19 | 386 | – | – |
+| + all three | 1,000 | 78 | 673 | 158 | 755 | 5.7 | 2.7 |
+
+("Expected bill lower by" includes the yearly capital cost; "saving" is before capital cost; "crisis" = averaged over
+the plan's worst 5% of scenarios. The combined payback uses only the solar and battery savings, not the PPA's.)
+
+**What it shows:**
+* **Solar's power is worth only 61% of a baseload MWh** (900 MWh produced → 552 "MWh at the monthly price"), because
+  midday prices are low in the last three years' data (July noon ≈ 0.25–0.5 × the monthly average). With a flat 24/7
+  load, a 1 MWp roof is all self-consumed on a typical day, so the 80% export price doesn't bite here.
+* **A PPA at today's fixed price is just a long fixed-price hedge:** it costs the 5% premium in expectation (€19k) and
+  takes €386k out of the bad case, almost exactly like fixing another 40% of power. A real PPA quote below the
+  forward price would change that; enter it in the app.
+* **Solar and the battery are cheaper in expectation and cut the bad case**, because their value rises with the
+  power price. Crisis paybacks are about half the normal ones.
+
+**Be careful with these numbers:**
+1. "Normal" here means today's elevated price level (fixed power price €199/MWh, 2026 average €122): at 2024–25
+   prices (€77–87/MWh, about 0.42× today's expected level) solar would save about €33k a year (payback ~20 years)
+   and the battery about €39k (payback ~9 years): 2–3× longer paybacks.
+2. The battery's daily spread is assumed to scale with the price level; in reality spreads depend on renewables and
+   flexibility, not only on the level. One cycle a day, perfect day-ahead foresight, no ordering constraint between
+   charging and discharging, no intraday or imbalance revenue.
+3. One typical production day per month: no sunny-day export peaks and no cloudy days; no degradation; solar and
+   battery effects are added (no interaction). The peak-shaving saving (€10k/yr for 1 MWh) is a network-cost
+   assumption, outside the commodity bill.
+4. The flat 24/7 load is an assumption; a daytime-only company would self-consume more solar and export less at night
+   (config `green.load_profile: daytime`).
+
 ## Procurement audit: "what would HedgeWise have saved you?" (new in v0.7)
 
 `python audit.py contracts.csv` (or the app tab "Your past contracts", or `report.py --audit` for a PDF page 2). The

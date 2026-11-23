@@ -99,6 +99,7 @@ TEXT = {
         "stress_h": "What if 2022 happens again?",
         "stress_note": "Historical stress scenarios, not forecasts. Left: 2022 monthly prices as they were. Right: "
         "today's fixed price × (2022 avg ÷ 2021 avg), 2022 monthly pattern. Fixed share at today's price.",
+        "green": "Green investments:",
         "audit_h": "Your past contracts vs the strategies (realised prices)",
         "audit_intro": "What you actually paid for gas and power (commodity cost only), next to what the same "
         "consumption would have cost with each strategy, using only the real historical prices. Your entries: "
@@ -142,6 +143,7 @@ TEXT = {
         "stress_h": "Wat als 2022 zich herhaalt?",
         "stress_note": "Historische stressscenario's, geen voorspellingen. Links: maandprijzen 2022 zoals ze waren. "
         "Rechts: vaste prijs nu × (gem. 2022 ÷ gem. 2021), maandpatroon 2022. Vast deel tegen de prijs van nu.",
+        "green": "Groene investeringen:",
         "audit_h": "Uw contracten vs de strategieën (gerealiseerde prijzen)",
         "audit_intro": "Wat u echt betaalde voor gas en stroom (alleen de energie zelf), naast wat hetzelfde verbruik "
         "had gekost met elke strategie, met alleen de echte historische prijzen. Uw invoer: {n} contractregels, "
@@ -237,10 +239,12 @@ def make_report(
     stress: dict | None = None,
     today: pd.Timestamp | None = None,
     audit: object | None = None,
+    green: pd.DataFrame | None = None,
 ) -> None:
     """Write the one-page PDF to `path` (file path or binary buffer).
     `stress` = output of hw.stress_test(a) (optional, adds the stress chart); `audit` = an audit.AuditResult
-    (optional, adds a second page with the past-contracts comparison)."""
+    (optional, adds a second page with the past-contracts comparison); `green` = green.evaluate()'s table (optional,
+    adds one line under the recommendation)."""
     if lang not in TEXT:
         raise ValueError(f"lang must be one of {list(TEXT)}")
     T = TEXT[lang]
@@ -355,6 +359,10 @@ def make_report(
         ),
         Paragraph(T["tradeoff"].format(a=money(d_e, lang), b=money(d_es, lang)), ss["body"]),
     ]
+    if green is not None and len(green):
+        from . import green as gr
+
+        rec_parts.append(Paragraph("<b>" + T["green"] + "</b> " + _esc(gr.report_line(green, lang)), ss["body"]))
     box = Table([[rec_parts]], colWidths=[W])
     box.setStyle(
         TableStyle(
@@ -374,13 +382,14 @@ def make_report(
     if stress:  # small stress chart in the bottom part of the page
         story.append(Paragraph(T["stress_h"], ss["h"]))
         sbuf = io.BytesIO()
-        fig, ax = plt.subplots(figsize=(8.2, 2.45))
+        sh = 2.45 if green is None else 2.0  # the green-investments line takes the room of a little chart height
+        fig, ax = plt.subplots(figsize=(8.2, sh))
         hw.plot_stress(stress, ax=ax, lang=lang, compact=True)
         fig.tight_layout(pad=0.4)
         fig.savefig(sbuf, format="png", dpi=200)
         plt.close(fig)
         sbuf.seek(0)
-        story.append(Image(sbuf, width=W, height=W * 2.45 / 8.2))
+        story.append(Image(sbuf, width=W, height=W * sh / 8.2))
         story.append(Paragraph(T["stress_note"], ss["small"]))
 
     if audit is not None:
@@ -485,6 +494,9 @@ def main(argv: list[str] | None = None) -> Path:
     ap.add_argument("--paths", type=int, default=DEFAULT_PATHS)
     ap.add_argument("--seed", type=int, default=DEFAULT_SEED)
     ap.add_argument("--solar-kwp", type=float, default=0.0)
+    ap.add_argument("--green-solar-kwp", type=float, default=0.0, help="green investment: rooftop solar (kWp)")
+    ap.add_argument("--green-battery-kwh", type=float, default=0.0, help="green investment: battery (kWh)")
+    ap.add_argument("--green-ppa-share", type=float, default=0.0, help="green investment: PPA share of power (0-1)")
     ap.add_argument("--audit", help="past contracts (CSV/Excel, see data/audit_example.csv): adds page 2")
     ap.add_argument("--out", help="output PDF path")
     args = ap.parse_args(argv)
@@ -501,6 +513,12 @@ def main(argv: list[str] | None = None) -> Path:
         from . import audit as au
 
         audit = au.run_audit(au.read_contracts(args.audit), company, df)
-    make_report(a, str(out), args.lang, stress, audit=audit)
+    from . import green as gr
+
+    inv = gr.Investments(
+        solar_kwp=args.green_solar_kwp, battery_kwh=args.green_battery_kwh, ppa_share=args.green_ppa_share
+    )
+    green = gr.evaluate(a, inv)[0] if inv.any() else None
+    make_report(a, str(out), args.lang, stress, audit=audit, green=green)
     print(f"Report written to {out}")
     return out

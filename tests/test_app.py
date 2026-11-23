@@ -32,3 +32,15 @@ def test_past_contracts_tab():
     assert ok and "2-year ladder would have cost €6.60m" in ok[0]  # default company = the backtest's numbers
     at.radio(key="audit_lang").set_value("NL").run()
     assert not at.exception and any(s.value.startswith("U betaalde") for s in at.success)
+
+
+def test_green_investments_section():
+    at = AppTest.from_file(APP, default_timeout=300).run()
+    assert any("Choose rooftop solar" in i.value for i in at.info)
+    next(n for n in at.sidebar.number_input if n.label == "Rooftop solar (kWp)").set_value(1000).run()
+    next(s for s in at.sidebar.slider if s.label.startswith("PPA")).set_value(40).run()
+    assert not at.exception
+    md = " ".join(m.value for m in at.markdown)
+    assert "+ solar 1 MWp: expected bill" in md and "+ PPA 40%: expected bill" in md
+    at.radio(key="green_lang").set_value("NL").run()
+    assert not at.exception and "+ zon 1 MWp: verwachte rekening" in " ".join(m.value for m in at.markdown)

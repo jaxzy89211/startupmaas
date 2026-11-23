@@ -12,6 +12,7 @@ import streamlit as st
 import hedgewise as hw
 from hedgewise import audit as au
 from hedgewise import company_input as ci
+from hedgewise import green as gr
 from hedgewise.naming import report_path
 from hedgewise.settings import APP, DEFAULT_RISK_AVERSION, DEFAULT_SEED
 
@@ -46,13 +47,15 @@ def stress_png(key: tuple, _stress: dict) -> bytes:
     return buf.getvalue()
 
 
-def report_pdf(a: hw.Analysis, lang: str, stress: dict | None, audit: object | None = None) -> bytes:
+def report_pdf(
+    a: hw.Analysis, lang: str, stress: dict | None, audit: object | None = None, green: pd.DataFrame | None = None
+) -> bytes:
     """The one-page PDF. Called only when someone clicks "Download" (Streamlit runs it on a separate thread,
     outside the page script, so no Streamlit calls or caches in here); reportlab is imported only then."""
     from hedgewise import report
 
     buf = io.BytesIO()
-    report.make_report(a, buf, lang, stress=stress, audit=audit)
+    report.make_report(a, buf, lang, stress=stress, audit=audit, green=green)
     return buf.getvalue()
 
 
@@ -140,13 +143,20 @@ with st.sidebar:
     st.success(f"{sum(company.gas_m3):,.0f} m³ gas · {sum(company.power_kwh) / 1e3:,.0f} MWh power per year")
     for n_ in notes:
         st.warning(n_)
-    company.solar_kwp = st.slider(
-        "Rooftop solar (kWp)",
-        0,
-        5000,
-        0,
-        step=100,
-        help=f"~{hw.SOLAR_YIELD_KWH_PER_KWP} kWh per kWp per year, all self-consumed",
+    st.header("Green investments")
+    g_solar = st.number_input("Rooftop solar (kWp)", 0, 20_000, 0, step=100)
+    g_batt = st.number_input("Battery capacity (kWh)", 0, 50_000, 0, step=250)
+    g_bkw = st.number_input("Battery power (kW; 0 = half the capacity)", 0, 50_000, 0, step=250)
+    g_ppa = st.slider("PPA: share of the power volume (%)", 0, 100, 0, 5)
+    g_ppa_price = st.number_input("PPA price (EUR/MWh; 0 = today's fixed price)", 0.0, 1000.0, 0.0, step=5.0)
+    g_ppa_years = st.number_input("PPA length (years)", 1, 25, 10)
+    inv = gr.Investments(
+        solar_kwp=float(g_solar),
+        battery_kwh=float(g_batt),
+        battery_kw=float(g_bkw) or None,
+        ppa_share=g_ppa / 100,
+        ppa_price=g_ppa_price or None,
+        ppa_years=int(g_ppa_years),
     )
 
     st.header("Decision")
@@ -194,9 +204,10 @@ with tab_today:
         s = sims(as_of, ds, n, DEFAULT_SEED)
         a = hw.analyse(m, company, ds, n, DEFAULT_SEED, lam, sims=s, allow_timing=allow_timing, budget=budget)
     # everything that changes the analysis: used as the cache key for the charts and the PDF
-    key = (as_of, ds, n, lam, budget, allow_timing, company.name, company.gas_m3, company.power_kwh, company.solar_kwp)
+    key = (as_of, ds, n, lam, budget, allow_timing, company.name, company.gas_m3, company.power_kwh)
 
     var_row, hw_row = a.table.loc["All variable"], a.table.iloc[-1]
+    green_t, green_arr = gr.evaluate(a, inv) if inv.any() else (None, None)
     try:
         stress = hw.stress_test(a, df)
     except ValueError:
@@ -220,12 +231,12 @@ with tab_today:
     # page 2 with the past-contracts audit, if one was run for this same consumption profile
     prev_audit = st.session_state.get("audit_result")
     audit_page = None
-    if prev_audit is not None and prev_audit[0] == (company.gas_m3, company.power_kwh, company.solar_kwp):
+    if prev_audit is not None and prev_audit[0] == (company.gas_m3, company.power_kwh):
         if rc1.checkbox("Add page 2: your past contracts", True):
             audit_page = prev_audit[1]
     rc2.download_button(
         "Download report (PDF)",
-        lambda: report_pdf(a, rep_lang.lower(), stress, audit_page),  # built on click, not on every rerun
+        lambda: report_pdf(a, rep_lang.lower(), stress, audit_page, green_t),  # built on click, not on every rerun
         type="primary",
         file_name=report_path(company.name, m.as_of).name,
         mime="application/pdf",
@@ -266,6 +277,40 @@ with tab_today:
             f"bad case €{var_row.es95 / 1e6:.2f}m)."
         )
 
+    st.subheader("Green investments / Groene investeringen")
+    if green_t is None:
+        st.info(
+            "Choose rooftop solar, a battery or a PPA in the sidebar to see what each does to the expected and "
+            "the bad-case bill, and its payback in normal and crisis conditions."
+        )
+    else:
+        glang = st.radio("Language / Taal", ["EN", "NL"], horizontal=True, key="green_lang").lower()
+        st.markdown(gr.summary_text(green_t, glang))
+        show = green_t.assign(
+            name=green_t.investment if glang == "en" else green_t.label_nl,
+        ).set_index("name")[
+            ["cut_expected", "cut_es95", "capex", "saving_normal", "saving_crisis", "payback_normal", "payback_crisis"]
+        ]
+        cols = gr.TABLE_COLUMNS[glang]
+        show = show.rename(columns=cols)
+        st.dataframe(
+            show.style.format(
+                {c: "{:,.0f}" for c in list(cols.values())[:5]}
+                | {c: (lambda v: "–" if v is None or pd.isna(v) else f"{v:.1f}") for c in list(cols.values())[5:]}
+            ),
+            width="stretch",
+        )
+        gbuf = io.BytesIO()
+        hw.plot_frontier(
+            a,
+            path=gbuf,
+            extra_points=[("HedgeWise plan " + r.investment, r.es95, r.expected) for r in green_t.itertuples()],
+        )
+        st.image(gbuf.getvalue(), width="stretch")
+        with st.expander("Assumptions" if glang == "en" else "Aannames"):
+            for line in gr.assumptions_text(glang):
+                st.markdown("- " + line)
+
     with st.expander("Model details"):
         st.code(hw.describe(m))
         src = a.recommendation["price_source"]
@@ -282,9 +327,9 @@ with tab_today:
 # Tab 2: procurement audit ("what would HedgeWise have saved you?")
 # --------------------------------------------------------------------------------------------
 @st.cache_data(show_spinner=False, max_entries=16)
-def audit_strategies(gas_m3: tuple, power_kwh: tuple, solar_kwp: float, last_year: int) -> pd.DataFrame:
+def audit_strategies(gas_m3: tuple, power_kwh: tuple, last_year: int) -> pd.DataFrame:
     """The comparison strategies for this consumption profile (slow: re-fits at every decision date; cached)."""
-    comp = hw.Company(name="audit", gas_m3=gas_m3, power_kwh=power_kwh, solar_kwp=solar_kwp)
+    comp = hw.Company(name="audit", gas_m3=gas_m3, power_kwh=power_kwh)
     return au.strategy_costs(comp, last_year, load())
 
 
@@ -370,7 +415,7 @@ with tab_audit:
             st.error(str(e))
             st.stop()
         with st.spinner(T["wait"]):
-            strat = audit_strategies(company.gas_m3, company.power_kwh, company.solar_kwp, max(years))
+            strat = audit_strategies(company.gas_m3, company.power_kwh, max(years))
         r = au.run_audit(contracts, company, df, strategies=strat)
         st.success(au.sentence(r, alang))
         show = (r.table / 1e3).round(0).astype(int)
@@ -388,4 +433,4 @@ with tab_audit:
             if r.contracts.fixed_on.notna().any():
                 st.caption(T["proxy"])
                 st.dataframe(r.contracts.dropna(subset=["fixed_on"]).round(1), width="stretch", hide_index=True)
-        st.session_state["audit_result"] = ((company.gas_m3, company.power_kwh, company.solar_kwp), r)
+        st.session_state["audit_result"] = ((company.gas_m3, company.power_kwh), r)

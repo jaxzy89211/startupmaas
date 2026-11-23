@@ -150,10 +150,12 @@ def plot_frontier(
     path: PathOrBuffer | None = None,
     text: dict | None = None,
     show_tradeoff: bool = True,
+    extra_points: list[tuple[str, float, float]] | None = None,
 ) -> None:
     """Efficient frontier: expected bill vs bad-case bill (ES95) for one hedge ratio 0-100% (gas and power),
     executed the recommended way. The CFO picks a point; HedgeWise marks the one for their risk appetite.
-    `text` overrides the labels (e.g. Dutch, see report.py); `path` may be a file path or a binary buffer."""
+    `text` overrides the labels (e.g. Dutch, see report.py); `path` may be a file path or a binary buffer.
+    `extra_points`: (label, es95, expected) in EUR, e.g. the plan + a green investment (green.evaluate)."""
     import matplotlib
 
     matplotlib.use("Agg")
@@ -188,6 +190,9 @@ def plot_frontier(
             h=h_txt, g=str(r["risk_aversion"]).replace(".", tx["decimal"])
         )
         ax.plot(rec.es95.iloc[0] / 1e6, rec.expected.iloc[0] / 1e6, "*", ms=18, color="#1b9e5a", zorder=4, label=lbl)
+    for i, (lbl, es, ex) in enumerate(extra_points or []):
+        mk, col = "DsP^v"[i % 5], ["#d97706", "#b45309", "#7c2d12", "#ea580c", "#9a3412"][i % 5]
+        ax.plot(es / 1e6, ex / 1e6, mk, ms=8, color=col, mec="white", mew=0.8, zorder=5, ls="none", label=lbl)
     if show_tradeoff and len(f) > 2:
         lo, hi = f.iloc[0], f.iloc[-1]
         d_e = (hi.expected - lo.expected) / 10 / 1e3
@@ -205,6 +210,9 @@ def plot_frontier(
         ax.xaxis.set_major_formatter(fmt)
         ax.yaxis.set_major_formatter(fmt)
     ax.margins(x=0.07, y=0.12)  # room for the 0% / 100% labels at the ends
+    if extra_points and show_tradeoff:  # keep the trade-off note (bottom left) clear of the investment points
+        lo, hi = ax.get_ylim()
+        ax.set_ylim(lo - 0.2 * (hi - lo), hi)
     ax.set_xlabel(tx["xlabel"])
     ax.set_ylabel(tx["ylabel"])
     ax.set_title(tx["title"])
