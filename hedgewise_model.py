@@ -398,6 +398,18 @@ def season_adjustment(pm: PowerModel, when, delivery_start) -> float:
     return float(level(dlv) / level(win))
 
 
+def real_forward(commodity: str, as_of, delivery_start) -> dict | None:
+    """Real calendar-year forward quote (forwards.py, data/forwards.csv) on or before as_of, if the file exists
+    and delivery starts on 1 January; otherwise None and the proxy is used."""
+    ds = pd.Timestamp(delivery_start)
+    if (ds.month, ds.day) != (1, 1):
+        return None
+    import forwards
+    if not forwards.available():
+        return None
+    return forwards.forward_quote(commodity, as_of, ds.year)
+
+
 def risk_stats(cost: np.ndarray, q=0.95) -> dict:
     var = float(np.quantile(cost, q))
     return {"expected": float(cost.mean()), "p50": float(np.median(cost)), f"var{int(q*100)}": var,
@@ -441,11 +453,18 @@ def analyse(m: FittedModel, company: Company, delivery_start=None, n_paths=10_00
     vol = {k: v[order] for k, v in vol.items()}
 
     spot_m, fwd_now, fwd_tr, c_var, c_fix, c_tr, anchor_k = {}, {}, {}, {}, {}, {}, {}
+    price_src = {}
     sims = dict(sims)  # never modify the (cached) input paths in place
     for c in ("gas", "power"):
         hist = m.history[c]
         adj = (lambda t: season_adjustment(m.power, t, ds)) if c == "power" else (lambda t: 1.0)
-        fwd_now[c] = float(hist.iloc[-FORWARD_LOOKBACK_DAYS:].mean() * adj(m.as_of) * (1 + FORWARD_PREMIUM))
+        q = real_forward(c, m.as_of, ds)
+        if q:   # real calendar forward: it IS the fixed price (and, below, the anchor)
+            fwd_now[c] = q["price"]
+            price_src[c] = f"forward {q['product']} quoted {q['date']:%Y-%m-%d}"
+        else:
+            fwd_now[c] = float(hist.iloc[-FORWARD_LOOKBACK_DAYS:].mean() * adj(m.as_of) * (1 + FORWARD_PREMIUM))
+            price_src[c] = "proxy (30-day spot" + (", seasonally adjusted" if c == "power" else "") + " + 5%)"
         if ANCHOR_TO_FORWARD:
             # The market (forward / fixed price) sets the LEVEL, the model sets the RISK.
             # Scale the paths so that E[profile-weighted delivery spot] = fixed price / (1 + premium),
@@ -527,7 +546,7 @@ def analyse(m: FittedModel, company: Company, delivery_start=None, n_paths=10_00
            "buy_now_gas": float(best.hedge_gas / n_exec), "buy_now_power": float(best.hedge_power / n_exec),
            "fixed_price_now": fwd_now, "budget": budget_eur,
            "mode": "budget" if budget_eur is not None else "risk_aversion",
-           "objective": OBJECTIVE, "anchor_scale": anchor_k}
+           "objective": OBJECTIVE, "anchor_scale": anchor_k, "price_source": price_src}
     return Analysis(m, company, ds, tr, spot_m, fwd_now, fwd_tr, costs, table, frontier, rec, sims)
 
 
@@ -875,8 +894,8 @@ def main(argv=None):
                 allow_timing=args.allow_timing, budget=args.budget)
     pd.set_option("display.width", 160)
     print((a.table / 1e3).round(0).astype(int).rename(columns=lambda c: c + " (kEUR)").to_string(), "\n")
-    print("Fixed price available today (proxy): " +
-          ", ".join(f"{k} {v:.1f} EUR/MWh" for k, v in a.fwd_now.items()))
+    print("Fixed price available today: " + ", ".join(
+        f"{k} {v:.1f} EUR/MWh [{a.recommendation['price_source'][k]}]" for k, v in a.fwd_now.items()))
     print(recommendation_text(a))
     if not args.demo:
         st_ = stress_test(a, df)

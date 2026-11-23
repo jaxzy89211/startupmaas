@@ -58,9 +58,11 @@ TEXT = {
                   "early 2021 to 2022, staying variable would cost {var}; with our recommendation {hw}. "
                   "(A historical stress scenario, not a forecast.)",
         "footer": "<b>HedgeWise</b> · Assumptions: commodity cost only (no network tariffs, energy tax or supplier "
-                  "margin); the fixed price is a proxy for real forward prices (recent market price + 5%); volumes are "
+                  "margin); {fixed}; volumes are "
                   "taken as known. Scenarios come from a statistical model of past prices and can miss events "
                   "that never happened before. This is decision support, not financial advice.",
+        "fixed_proxy": "the fixed price is a proxy for real forward prices (recent market price + 5%)",
+        "fixed_real": "fixed prices are real forward prices ({products})",
         "chart": {},
     },
     "nl": {
@@ -89,10 +91,11 @@ TEXT = {
                   "2021 naar 2022, kost variabel blijven {var}; met ons advies {hw}. "
                   "(Een historisch stressscenario, geen voorspelling.)",
         "footer": "<b>HedgeWise</b> · Aannames: alleen de kosten van de energie zelf (geen netbeheerkosten, "
-                  "energiebelasting of leveranciersmarge); de vaste prijs is een benadering van echte termijnprijzen "
-                  "(recente marktprijs + 5%); het verbruik wordt als bekend aangenomen. De scenario's komen uit een "
+                  "energiebelasting of leveranciersmarge); {fixed}; het verbruik wordt als bekend aangenomen. De scenario's komen uit een "
                   "statistisch model van prijzen uit het verleden en kunnen gebeurtenissen missen die nog nooit "
                   "zijn voorgekomen. Dit is beslisondersteuning, geen financieel advies.",
+        "fixed_proxy": "de vaste prijs is een benadering van echte termijnprijzen (recente marktprijs + 5%)",
+        "fixed_real": "de vaste prijzen zijn echte termijnprijzen ({products})",
         "chart": {
             "title": "Kies uw afweging: deel van volgend jaar vastgezet",
             "xlabel": "Slecht scenario: gemiddelde van de 5% duurste scenario's (€ mln)",
@@ -254,7 +257,10 @@ def make_report(a: hw.Analysis, path, lang: str = "en", stress: dict | None = No
         canv.drawString(1.8 * cm, A4[1] - 0.75 * cm, "HedgeWise")
         canv.setFont("Helvetica", 8.5)
         canv.drawRightString(A4[0] - 1.8 * cm, A4[1] - 0.72 * cm, T["doc_title"])
-        foot = Paragraph(T["footer"], ss["foot"])
+        src = r.get("price_source", {})
+        real = [v.split(" quoted")[0].replace("forward ", "") for v in src.values() if v.startswith("forward")]
+        fixed = T["fixed_real"].format(products=", ".join(real)) if real else T["fixed_proxy"]
+        foot = Paragraph(T["footer"].format(fixed=fixed), ss["foot"])
         _, fh = foot.wrap(W, 3 * cm)
         canv.setStrokeColor(colors.HexColor("#d1d5db"))
         canv.line(1.8 * cm, 1.2 * cm + fh + 4, A4[0] - 1.8 * cm, 1.2 * cm + fh + 4)

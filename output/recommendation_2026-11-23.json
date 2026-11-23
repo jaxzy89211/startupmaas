@@ -1,14 +1,14 @@
 {
-  "hedge_gas": 0.55,
-  "hedge_power": 0.55,
+  "hedge_gas": 0.6,
+  "hedge_power": 0.6,
   "execution": "tranches",
   "risk_aversion": 0.5,
   "tranches": [
     "2026-11-23",
     "2026-12-01"
   ],
-  "buy_now_gas": 0.275,
-  "buy_now_power": 0.275,
+  "buy_now_gas": 0.3,
+  "buy_now_power": 0.3,
   "fixed_price_now": {
     "gas": 95.85736965179443,
     "power": 199.43165048112257
@@ -17,7 +17,11 @@
   "mode": "risk_aversion",
   "objective": "mean_variance",
   "anchor_scale": {
-    "gas": 1.0456702761182846,
-    "power": 1.1719716557797004
+    "gas": 1.0138542759925488,
+    "power": 1.1470739188026084
+  },
+  "price_source": {
+    "gas": "proxy (30-day spot + 5%)",
+    "power": "proxy (30-day spot, seasonally adjusted + 5%)"
   }
 }

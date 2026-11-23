@@ -1,0 +1,10 @@
+date;product;price;source
+01-11-2026;TTF Cal-27;71,50;FAKE - for tests only
+13-11-2026;TTF Cal-27;72,25;FAKE - for tests only
+20-11-2026;TTF Cal-27;73,10;FAKE - for tests only
+25-11-2026;TTF Cal-27;80,00;FAKE - for tests only (after the test as-of date)
+20-11-2026;NL Base Cal-27;151,40;FAKE - for tests only
+20-11-2026;NL Peak Cal-27;190,00;FAKE - peakload, must be ignored
+20-11-2026;TTF Q1-27;95,00;FAKE - quarter, must be ignored
+30-06-2021;TTF Cal-22;22,80;FAKE - for tests only
+30-06-2021;Dutch Power Baseload Cal 2022;66,10;FAKE - for tests only

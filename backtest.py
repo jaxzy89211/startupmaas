@@ -39,6 +39,7 @@ import company_input
 import hedgewise_model as hw
 
 DECISION_MONTHS = [6, 7, 8, 9, 10, 11]   # as-of = last day of these months in year Y-1
+SOURCES = {"forward": 0, "proxy": 0}         # how many fixed prices came from real forwards vs the proxy
 POLICY_GAMMA = 0.5                         # risk aversion used by the HedgeWise policy (layered, capped)
 
 
@@ -54,6 +55,12 @@ def realised_monthly(df: pd.DataFrame, year: int) -> dict[str, np.ndarray]:
 
 
 def fixed_price(df, c, as_of, delivery_start, model=None):
+    """Real forward (data/forwards.csv, latest quote on or before as_of) if available, else the proxy."""
+    q = hw.real_forward(c, as_of, delivery_start)
+    if q:
+        SOURCES["forward"] += 1
+        return float(q["price"])
+    SOURCES["proxy"] += 1
     hist = df.loc[:as_of, c]
     p = hist.iloc[-hw.FORWARD_LOOKBACK_DAYS:].mean()
     if c == "power" and model is not None:
@@ -327,6 +334,10 @@ def main(argv=None):
     (hw.OUT / "backtest_details.json").write_text(json.dumps({str(k): v for k, v in infos.items()}, indent=2,
                                                              default=float))
 
+    import forwards
+    print(f"\nFixed prices: {SOURCES['forward']} from real forwards "
+          f"({forwards.FORWARDS_PATH.name if forwards.available() else 'no data/forwards.csv'}), "
+          f"{SOURCES['proxy']} from the proxy (30-day spot + 5%).")
     pd.set_option("display.width", 200)
     print("\nRealised annual bill, EUR k")
     show = (res / 1e3).round(0).astype(int)

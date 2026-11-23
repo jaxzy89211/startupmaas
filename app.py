@@ -173,6 +173,9 @@ if pd.Timestamp(ds) + pd.DateOffset(years=1) <= df.index.max():
 
 with st.expander("Model details"):
     st.code(hw.describe(m))
-    st.caption("Commodity cost only (no network tariffs, energy tax or supplier margin). Fixed prices are a stand-in "
-               "for real forward prices: 30-day average spot (power seasonally adjusted) + 5%. The simulated price level "
-               "is anchored to that fixed price (minus the premium); the model supplies the risk around it.")
+    src = a.recommendation["price_source"]
+    st.markdown("**Fixed prices used:** " + "; ".join(f"{k} €{a.fwd_now[k]:.1f}/MWh ({v})" for k, v in src.items()))
+    st.caption("Commodity cost only (no network tariffs, energy tax or supplier margin). Without data/forwards.csv the "
+               "fixed price is a stand-in for real forward prices: 30-day average spot (power seasonally adjusted) + 5%. "
+               "The simulated price level is anchored to the fixed price (minus the premium); the model supplies the "
+               "risk around it.")
