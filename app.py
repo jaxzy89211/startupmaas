@@ -405,6 +405,66 @@ def pdf_button(
     )
 
 
+def plan_tracker(T: dict, lang: str) -> None:
+    """Tab 3: a client's plan (tranches planned vs bought), the bad case over time, and this month's draft update."""
+    from pathlib import Path
+
+    from hedgewise import monitor as mo
+
+    folder = Path(hw.ROOT) / "clients"
+    files = sorted(folder.glob("*.yaml")) + sorted((folder / "private").glob("*.yaml"))
+    if not files:
+        st.info(T["tr_none"])
+        return
+    f = st.selectbox(T["tr_client"], files, format_func=lambda p: p.stem, key="tr_client")
+    client = mo.load_client(f)
+    plan = client["plan"]
+    today = load().index.max()
+    status = mo.plan_status(plan, today)
+    st.subheader(client["name"])
+    st.markdown(
+        T["tr_plan"].format(
+            year=plan["delivery_year"],
+            target=f"{status['target']:.0%}",
+            bought=f"{status['bought']:.0%}",
+            planned=f"{status['planned']:.0%}",
+        )
+    )
+    st.progress(min(1.0, status["bought"] / status["target"]) if status["target"] else 0.0)
+    months = [pd.Period(m, "M") for m in plan["tranche_months"]]
+    rows = []
+    for i, m in enumerate(months, start=1):
+        bought = sum(t["share"] for t in plan["tranches"] if pd.Timestamp(t["date"]).to_period("M") <= m)
+        rows.append(
+            {
+                T["tr_month"]: str(m),
+                T["tr_planned"]: f"{plan['target_share'] * i / len(months):.0%}",
+                T["tr_bought"]: f"{bought:.0%}" if m <= today.to_period("M") else "",
+            }
+        )
+    st.caption(T["tr_table"])
+    st.dataframe(pd.DataFrame(rows), hide_index=True)
+    hpath = mo.HISTORY / f"{mo.slug(client['name'])}.csv"
+    st.caption(T["tr_history"])
+    if hpath.exists():
+        h = pd.read_csv(hpath, comment="#")
+        h = h.set_index("run_date")[["bad_case_now", "bad_case_plan"]] / 1e6
+        st.line_chart(h.rename(columns={"bad_case_now": T["tr_now"], "bad_case_plan": T["tr_full"]}))
+    else:
+        st.info(T["tr_no_history"])
+    if st.button(T["tr_run"], key="tr_run_btn"):
+        with st.spinner(T["tr_running"]), PLOT_LOCK:
+            res = mo.run_client(client, load())
+        st.warning(T["tr_draft"])
+        st.info(mo.todo_text(res, lang))
+        for x in mo.flag_texts(res, lang):
+            st.warning(x)
+        st.download_button(
+            T["tr_pdf"], res["files"][0].read_bytes(), file_name=res["files"][0].name, mime="application/pdf"
+        )
+        st.text_area(T["tr_email"], res["files"][1].read_text(), height=320)
+
+
 # --------------------------------------------------------------------------------------------
 # Page
 # --------------------------------------------------------------------------------------------
@@ -498,7 +558,7 @@ with st.sidebar:
     allow_timing = st.checkbox(T["timing"], False, key="timing")
     n = st.select_slider(T["scenarios"], APP["scenario_choices"], APP["default_scenarios"], key="n")
 
-tab_today, tab_audit = st.tabs([T["tab_today"], T["tab_audit"]])
+tab_today, tab_audit, tab_tracker = st.tabs([T["tab_today"], T["tab_audit"], T["tab_tracker"]])
 
 with tab_today:
     m, a, stress, key = run_analysis(company, T, as_of, n, lam, budget, allow_timing)
@@ -568,3 +628,6 @@ with tab_today:
 
 with tab_audit:
     audit_ui(company, T, lang)
+
+with tab_tracker:
+    plan_tracker(T, lang)

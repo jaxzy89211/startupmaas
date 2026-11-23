@@ -47,6 +47,18 @@ SHOTS = [  # (file, url query, text that must be on the page at the end, page he
             ("wait", "Bevestigd"),
         ],
     ),
+    (
+        "06_plan_tracker_nl.png",
+        "?lang=nl",
+        "CONCEPT: controleer",
+        2600,
+        [
+            ("wait", "Advies: deel vastzetten"),
+            ("click", "Plan volgen"),
+            ("wait", "Plan voor 2027"),
+            ("click", "Bereken de update van deze maand (concept)"),
+        ],
+    ),
 ]
 
 

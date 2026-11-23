@@ -90,3 +90,11 @@ def test_invoice_pdf_route_waits_for_files_and_confirmation():
     at.radio(key="lang").set_value("NL").run()
     assert not at.exception and at.radio(key="source").value == "pdf"  # the choice survives the language switch
     assert "Facturen of contracten (PDF)" in at.radio(key="source").options
+
+
+def test_plan_tracker_tab(tmp_path, monkeypatch):
+    at = _app()
+    assert [t.label for t in at.tabs] == ["Today's risk", "Your past contracts", "Plan tracker"]
+    assert any("Plan for 2027: target 55%" in m.value for m in at.markdown)
+    at.radio(key="lang").set_value("NL").run()
+    assert not at.exception and any("Plan voor 2027: doel 55%" in m.value for m in at.markdown)
