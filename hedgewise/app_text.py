@@ -71,6 +71,12 @@ UI = {
         "date_custom": "Custom",
         "as_of": "As of",
         "goal": "Goal",
+        "goal_ladder": "HedgeWise ladder (recommended, pre-registered)",
+        "goal_model": "Model-only (not recommended: procyclical, see RESULTS.md)",
+        "prev_target": "Ladder: share of next year already fixed last season (%, 0 = none)",
+        "m_bad_src": "{src}",
+        "src_model": "from the model",
+        "src_stress": "from the 2021->22 shock",
         "goal_balance": "Balance cost and risk",
         "goal_budget": "Stay within a budget",
         "risk": "Risk aversion",
@@ -226,6 +232,12 @@ UI = {
         "date_custom": "Zelf kiezen",
         "as_of": "Per datum",
         "goal": "Doel",
+        "goal_ladder": "HedgeWise-ladder (aanbevolen, vooraf vastgelegd)",
+        "goal_model": "Alleen model (niet aanbevolen: procyclisch, zie RESULTS.md)",
+        "prev_target": "Ladder: deel van volgend jaar dat vorig seizoen al vastlag (%, 0 = niets)",
+        "m_bad_src": "{src}",
+        "src_model": "uit het model",
+        "src_stress": "uit de schok als 2021->22",
         "goal_balance": "Kosten en risico afwegen",
         "goal_budget": "Binnen een budget blijven",
         "risk": "Risicoaversie",
@@ -400,7 +412,7 @@ def recommendation_md(a: object, lang: str) -> str:
 
     T = REPORT_TEXT[lang]
     r, t = a.recommendation, a.table
-    var_row, hw_row = t.loc["All variable"], t.iloc[-1]
+    hw_row = t.iloc[-1]
     k = len(r["tranches"])
     if r["execution"] == "now" or k == 1:
         rec = T["rec_now"].format(h=pct(r["hedge_gas"]))
@@ -413,10 +425,14 @@ def recommendation_md(a: object, lang: str) -> str:
         )
     if not np.isclose(r["hedge_gas"], r["hedge_power"]):
         rec += " (" + UI[lang]["share_split"].format(g=pct(r["hedge_gas"]), p=pct(r["hedge_power"])) + ")"
+    from .strategies import bad_case
+    from .texts import ladder_lines
+
     eff = T["rec_effect"].format(
-        e=money(hw_row.expected, lang), es=money(hw_row.es95, lang), es0=money(var_row.es95, lang)
+        e=money(hw_row.expected, lang), es=money(bad_case(a)[0], lang), es0=money(bad_case(a, "All variable")[0], lang)
     )
-    return _md(rec) + "  \n" + _md(eff) + "  \n" + frontier_scale_sentence(a, lang)
+    extra = "".join("  \n" + _md(x) for x in ladder_lines(a, lang))
+    return _md(rec) + "  \n" + _md(eff) + "  \n" + frontier_scale_sentence(a, lang) + extra
 
 
 def eur_m(x: float, lang: str) -> str:
@@ -439,6 +455,8 @@ def strategy_table(a: object, lang: str) -> pd.DataFrame:
         "worst": "slechtste",
         "best": "beste",
         "cost_at_risk": "risico (ES95 - verwacht)",
+        "shock": "schok als 2021->22",
+        "bad_case": "slecht scenario (getoond)",
     }
     t = (a.table / 1e3).round(0).astype(int)
     if lang == "nl":

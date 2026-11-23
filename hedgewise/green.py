@@ -273,8 +273,8 @@ def effects(
 # Evaluation on the scenarios of an Analysis
 # --------------------------------------------------------------------------------------------
 def plan_key(a: object) -> str:
-    """The HedgeWise recommendation's column in a.costs."""
-    return next(k for k in a.costs if k.startswith("HedgeWise"))
+    """The recommended plan's column in a.costs: the last one (the ladder, model-only or budget plan)."""
+    return list(a.costs)[-1]
 
 
 def bill_change(a: object, e: Effect) -> np.ndarray:
@@ -283,7 +283,9 @@ def bill_change(a: object, e: Effect) -> np.ndarray:
     return e.delta_mwh_eq[order] @ a.spot_month["power"] + e.fixed_eur
 
 
-def evaluate(a: object, inv: Investments, shapes: dict | None = None) -> tuple[pd.DataFrame, dict]:
+def evaluate(
+    a: object, inv: Investments, shapes: dict | None = None, df: pd.DataFrame | None = None
+) -> tuple[pd.DataFrame, dict]:
     """Table per investment (and all selected together) on top of the HedgeWise plan, plus the cost arrays.
 
     expected / es95: the plan's bill with the investment; cut_*: how much lower than the plan alone.
@@ -316,6 +318,7 @@ def evaluate(a: object, inv: Investments, shapes: dict | None = None) -> tuple[p
                 "label_nl": label["nl"],
                 "expected": float(cost.mean()),
                 "es95": float(cost[cost >= var].mean()),
+                **_honest(a, df, group, float(cost[cost >= var].mean())),
                 "cut_expected": float(base.mean() - cost.mean()),
                 "cut_es95": float(es0 - cost[cost >= var].mean()),
                 "capex": capex,
@@ -327,7 +330,28 @@ def evaluate(a: object, inv: Investments, shapes: dict | None = None) -> tuple[p
             }
         )
         arrays[label["en"]] = cost
-    return pd.DataFrame(rows), {"effects": effs, "costs": arrays, "plan": base}
+    out = pd.DataFrame(rows)
+    if "plan_bad_case" in out:  # honest bad case: the cut is measured on it too
+        out["cut_es95"] = out["plan_bad_case"] - out["bad_case"]
+    return out, {"effects": effs, "costs": arrays, "plan": base}
+
+
+def _honest(a: object, df: pd.DataFrame | None, group: list[Effect], es95: float) -> dict:
+    """The honest bad case of plan + investments (strategies.honest_bad_case): the higher of the model's ES95 and the
+    bill in the 2021->22-size shock (the investments' price-dependent part valued at the shock's power prices)."""
+    from .strategies import bad_case, shock_prices
+
+    if df is None or "bad_case" not in a.table:
+        return {"bad_case": es95, "bad_case_source": "model"}
+    order = [(a.delivery_start + pd.DateOffset(months=i)).month - 1 for i in range(12)]
+    p = shock_prices(a, df)["power"]
+    plan_shock = float(a.table.iloc[-1]["shock"])
+    shock = plan_shock + sum(float(e.delta_mwh_eq[order] @ p) + e.fixed_eur for e in group)
+    return {
+        "bad_case": max(es95, shock),
+        "bad_case_source": "stress" if shock > es95 else "model",
+        "plan_bad_case": bad_case(a)[0],
+    }
 
 
 def _savings(a: object, group: list[Effect], bad: np.ndarray) -> tuple[float, float]:

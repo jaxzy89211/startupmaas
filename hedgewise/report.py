@@ -16,7 +16,6 @@ import io
 import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_LEFT
@@ -31,7 +30,7 @@ from hedgewise import provenance
 from hedgewise._types import PathOrBuffer
 from hedgewise.naming import report_path  # re-exported: report.report_path() keeps working
 from hedgewise.settings import DEFAULT_PATHS, DEFAULT_RISK_AVERSION, DEFAULT_SEED
-from hedgewise.texts import NL_MONTHS, TEXT, _num, money, pct  # noqa: F401 (re-exported: report.TEXT etc.)
+from hedgewise.texts import NL_MONTHS, TEXT, _num, ladder_lines, money, pct  # noqa: F401 (re-exported)
 
 # ---- Fonts: embed DejaVu Sans (ships with matplotlib, no download). The built-in Helvetica has no glyph for "³"
 # (m³ rendered as "m "), and an embedded TTF also looks the same in every PDF viewer.
@@ -83,11 +82,8 @@ def date_str(d: pd.Timestamp, lang: str) -> str:
 
 def tradeoff_per_10pct(a: hw.Analysis) -> tuple[float, float]:
     """(extra expected cost, bad-case reduction) per extra 10% fixed, averaged over 0-100% (as in plot_frontier)."""
-    r = a.recommendation
-    f = a.frontier
-    f = f[(f.execution == r["execution"]) & np.isclose(f.hedge_gas, f.hedge_power)].sort_values("hedge_gas")
-    lo, hi = f.iloc[0], f.iloc[-1]
-    return float((hi.expected - lo.expected) / 10), float((lo.es95 - hi.es95) / 10)
+    d_e, d_bad = hw.frontier_scale(a)
+    return d_e / 10, d_bad / 10
 
 
 # --------------------------------------------------------------------------------------------
@@ -101,6 +97,7 @@ def make_report(
     today: pd.Timestamp | None = None,
     audit: object | None = None,
     green: pd.DataFrame | None = None,
+    _stress_height: float = 2.45,
 ) -> None:
     """Write the one-page PDF to `path` (file path or binary buffer).
     `stress` = output of hw.stress_test(a) (optional, adds the stress chart); `audit` = an audit.AuditResult
@@ -112,6 +109,12 @@ def make_report(
     today = pd.Timestamp(today) if today is not None else pd.Timestamp.today().normalize()
     c, r, t = a.company, a.recommendation, a.table
     var_row, hw_row = t.loc["All variable"], t.iloc[-1]
+    from hedgewise.strategies import bad_case
+
+    bad_var, src_var = bad_case(a, "All variable")
+    bad_plan, _ = bad_case(a)
+    honest = "bad_case" in t
+    bad_lbl = T["bad_from"].format(src=T["bad_src"][src_var]) if honest else T["bad_lbl"]
     n_paths = len(next(iter(a.costs.values())))
 
     ss = {
@@ -152,10 +155,10 @@ def make_report(
     # the bill if variable
     story.append(Paragraph(T["bill_h"], ss["h"]))
     cells = [
-        [Paragraph(T["expected_lbl"], ss["lbl"]), Paragraph(T["bad_lbl"], ss["lbl"])],
+        [Paragraph(T["expected_lbl"], ss["lbl"]), Paragraph(bad_lbl, ss["lbl"])],
         [
             Paragraph(money(var_row.expected, lang), ss["big"]),
-            Paragraph(f"<font color='#b8433a'>{money(var_row.es95, lang)}</font>", ss["big"]),
+            Paragraph(f"<font color='#b8433a'>{money(bad_var, lang)}</font>", ss["big"]),
         ],
     ]
     tb = Table(cells, colWidths=[W / 2, W / 2])
@@ -175,7 +178,8 @@ def make_report(
     )
     story.append(tb)
     story.append(Spacer(1, 2))
-    story.append(Paragraph(T["bill_note"].format(n=_num(n_paths, lang)), ss["small"]))
+    note = T["bill_note"].format(n=_num(n_paths, lang))
+    story.append(Paragraph(note + (" " + T["honest_note"] if honest else ""), ss["small"]))
 
     # frontier chart
     story.append(Paragraph(T["chart_h"], ss["h"]))
@@ -213,13 +217,13 @@ def make_report(
         Paragraph(rec_txt, ss["rec"]),
         Spacer(1, 3),
         Paragraph(
-            T["rec_effect"].format(
-                e=money(hw_row.expected, lang), es=money(hw_row.es95, lang), es0=money(var_row.es95, lang)
-            ),
+            T["rec_effect"].format(e=money(hw_row.expected, lang), es=money(bad_plan, lang), es0=money(bad_var, lang)),
             ss["body"],
         ),
         Paragraph(T["tradeoff"].format(a=money(d_e, lang), b=money(d_es, lang)), ss["body"]),
     ]
+    for line in ladder_lines(a, lang):
+        rec_parts.append(Paragraph(line, ss["small"] if line.startswith(T["rule_ladder"][:5]) else ss["body"]))
     if green is not None and len(green):
         from . import green as gr
 
@@ -243,7 +247,7 @@ def make_report(
     if stress:  # small stress chart in the bottom part of the page
         story.append(Paragraph(T["stress_h"], ss["h"]))
         sbuf = io.BytesIO()
-        sh = 2.45 if green is None else 2.0  # the green-investments line takes the room of a little chart height
+        sh = _stress_height if green is None else _stress_height - 0.45  # a green line takes some chart height
         fig, ax = plt.subplots(figsize=(8.2, sh))
         hw.plot_stress(stress, ax=ax, lang=lang, compact=True)
         fig.tight_layout(pad=0.4)
@@ -292,6 +296,11 @@ def make_report(
     )
     doc.build(story, onFirstPage=_page, onLaterPages=_page)
     pages = 1 if audit is None else 2
+    if doc.page != pages and stress and _stress_height > 1.3:  # extra lines: make the stress chart smaller, retry
+        if isinstance(path, io.BytesIO):
+            path.seek(0)
+            path.truncate()
+        return make_report(a, path, lang, stress, today, audit, green, _stress_height - 0.3)
     if doc.page != pages:
         raise RuntimeError(f"Report has {doc.page} pages instead of {pages}; shorten the text.")
 
@@ -351,7 +360,15 @@ def main(argv: list[str] | None = None) -> Path:
     company_input.add_cli_args(ap)
     ap.add_argument("--lang", default="en", choices=list(TEXT))
     ap.add_argument("--as-of", help="decision date YYYY-MM-DD (default: last date with data)")
-    ap.add_argument("--risk-aversion", type=float, default=DEFAULT_RISK_AVERSION)
+    ap.add_argument(
+        "--rule",
+        default="ladder",
+        choices=["ladder", "model-only"],
+        help="ladder = the pre-registered HedgeWise ladder (default); model-only = the plain optimiser "
+        "(not recommended: procyclical, see RESULTS.md)",
+    )
+    ap.add_argument("--prev-target", type=float, help="ladder: last season's fixed share for this year (0-1)")
+    ap.add_argument("--risk-aversion", type=float, default=DEFAULT_RISK_AVERSION, help="model-only rule")
     ap.add_argument("--budget", help="EUR or 'auto'")
     ap.add_argument("--paths", type=int, default=DEFAULT_PATHS)
     ap.add_argument("--seed", type=int, default=DEFAULT_SEED)
@@ -366,7 +383,9 @@ def main(argv: list[str] | None = None) -> Path:
     company.solar_kwp = args.solar_kwp
     df = hw.load_prices()
     m = hw.fit(df, args.as_of)
-    a = hw.analyse(m, company, None, args.paths, args.seed, args.risk_aversion, budget=args.budget)
+    a = hw.recommend(
+        m, company, df, None, args.paths, args.seed, args.rule, args.risk_aversion, args.budget, args.prev_target
+    )
     stress = hw.stress_test(a, df) if hasattr(hw, "stress_test") else None
     out = Path(args.out) if args.out else report_path(company.name, m.as_of)
     out.parent.mkdir(exist_ok=True)

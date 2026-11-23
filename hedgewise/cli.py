@@ -42,7 +42,7 @@ from .data import demo_prices, load_prices
 from .models import describe, fit
 from .provenance import one_line, write_csv, write_json
 from .settings import DEFAULT_PATHS, DEFAULT_RISK_AVERSION, DEFAULT_SEED, OUT
-from .strategies import Analysis, analyse, recommendation_text, stress_test
+from .strategies import Analysis, recommend, recommendation_text, stress_test
 
 
 # --------------------------------------------------------------------------------------------
@@ -54,7 +54,18 @@ def main(argv: list[str] | None = None) -> Analysis:
     ap.add_argument("--as-of", help="decision date YYYY-MM-DD (default: last date with data)")
     ap.add_argument("--delivery-start", help="first delivery month YYYY-MM-01 (default: next 1 January)")
     ap.add_argument(
-        "--risk-aversion", type=float, default=DEFAULT_RISK_AVERSION, help="0 = only expected cost, 1 = only bad case"
+        "--rule",
+        default="ladder",
+        choices=["ladder", "model-only"],
+        help="ladder = the pre-registered HedgeWise ladder (default); model-only = the plain optimiser "
+        "(not recommended: procyclical, see RESULTS.md)",
+    )
+    ap.add_argument("--prev-target", type=float, help="ladder: last season's fixed share for this year (0-1)")
+    ap.add_argument(
+        "--risk-aversion",
+        type=float,
+        default=DEFAULT_RISK_AVERSION,
+        help="model-only rule: 0 = only expected cost, 1 = only bad case",
     )
     ap.add_argument("--paths", type=int, default=DEFAULT_PATHS)
     ap.add_argument("--seed", type=int, default=DEFAULT_SEED)
@@ -79,15 +90,18 @@ def main(argv: list[str] | None = None) -> Analysis:
     as_of = args.as_of or (str(df.index.max().date()) if not args.demo else "2021-06-30")
     m = fit(df, as_of)
     print(describe(m), "\n")
-    a = analyse(
+    a = recommend(
         m,
         company,
+        df,
         args.delivery_start,
         args.paths,
         args.seed,
+        args.rule,
         args.risk_aversion,
+        args.budget,
+        args.prev_target,
         allow_timing=args.allow_timing,
-        budget=args.budget,
     )
     pd.set_option("display.width", 160)
     print((a.table / 1e3).round(0).astype(int).rename(columns=lambda c: c + " (kEUR)").to_string(), "\n")

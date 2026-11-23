@@ -139,6 +139,9 @@ FRONTIER_TEXT_EN = {
     "ylabel": "Expected bill (EUR m)",
     "pick": "HedgeWise pick: fix {h} (risk aversion {g})",
     "pick_budget": "HedgeWise pick: fix {h} (budget)",
+    "pick_ladder": "HedgeWise ladder: fix {h}",
+    "xlabel_honest": "Bad case: the worse of the model's worst 5% and a 2021->22-size shock (EUR m)",
+    "stress_points": "open dot = bad case set by the shock scenario",
     "tradeoff": "Each extra 10% fixed: about EUR {e}k more on average,\nEUR {es}k less in the bad case",
     "decimal": ".",
 }
@@ -169,15 +172,25 @@ def plot_frontier(
     r = a.recommendation
     f = a.frontier
     f = f[(f.execution == r["execution"]) & (np.isclose(f.hedge_gas, f.hedge_power))].sort_values("hedge_gas")
-    ax.plot(f.es95 / 1e6, f.expected / 1e6, "-", color="#2a6fdb", lw=1.8, zorder=2)
+    bc = "bad_case" if "bad_case" in f else "es95"  # the honest bad case if honest_bad_case() was applied
+    ax.plot(f[bc] / 1e6, f.expected / 1e6, "-", color="#2a6fdb", lw=1.8, zorder=2)
     for _, row in f.iterrows():
         h = row.hedge_gas
         is_lbl = np.isclose(h % 0.25, 0) or np.isclose(h % 0.25, 0.25)
-        ax.plot(row.es95 / 1e6, row.expected / 1e6, "o", ms=6 if is_lbl else 3, color="#2a6fdb", zorder=3)
+        stress = row.get("bad_case_source", "model") == "stress"  # hollow: the bad case comes from the stress test
+        ax.plot(
+            row[bc] / 1e6,
+            row.expected / 1e6,
+            "o",
+            ms=6 if is_lbl else 3,
+            zorder=3,
+            color="#2a6fdb",
+            mfc="white" if stress else "#2a6fdb",
+        )
         if is_lbl:
             ax.annotate(
                 f"{h:.0%}",
-                (row.es95 / 1e6, row.expected / 1e6),
+                (row[bc] / 1e6, row.expected / 1e6),
                 textcoords="offset points",
                 xytext=(4, 6),
                 fontsize=9,
@@ -186,17 +199,16 @@ def plot_frontier(
     rec = f[np.isclose(f.hedge_gas, r["hedge_gas"])]
     if len(rec):
         h_txt = f"{r['hedge_gas']:.0%}"
-        lbl = (tx["pick_budget"] if r["mode"] == "budget" else tx["pick"]).format(
-            h=h_txt, g=str(r["risk_aversion"]).replace(".", tx["decimal"])
-        )
-        ax.plot(rec.es95.iloc[0] / 1e6, rec.expected.iloc[0] / 1e6, "*", ms=18, color="#1b9e5a", zorder=4, label=lbl)
+        key = "pick_budget" if r["mode"] == "budget" else ("pick_ladder" if r.get("rule") == "ladder" else "pick")
+        lbl = tx[key].format(h=h_txt, g=str(r["risk_aversion"]).replace(".", tx["decimal"]))
+        ax.plot(rec[bc].iloc[0] / 1e6, rec.expected.iloc[0] / 1e6, "*", ms=18, color="#1b9e5a", zorder=4, label=lbl)
     for i, (lbl, es, ex) in enumerate(extra_points or []):
         mk, col = "DsP^v"[i % 5], ["#d97706", "#b45309", "#7c2d12", "#ea580c", "#9a3412"][i % 5]
         ax.plot(es / 1e6, ex / 1e6, mk, ms=8, color=col, mec="white", mew=0.8, zorder=5, ls="none", label=lbl)
     if show_tradeoff and len(f) > 2:
         lo, hi = f.iloc[0], f.iloc[-1]
         d_e = (hi.expected - lo.expected) / 10 / 1e3
-        d_es = (lo.es95 - hi.es95) / 10 / 1e3
+        d_es = (lo[bc] - hi[bc]) / 10 / 1e3
         ax.text(
             0.03,
             0.05,
@@ -213,7 +225,9 @@ def plot_frontier(
     if extra_points and show_tradeoff:  # keep the trade-off note (bottom left) clear of the investment points
         lo, hi = ax.get_ylim()
         ax.set_ylim(lo - 0.2 * (hi - lo), hi)
-    ax.set_xlabel(tx["xlabel"])
+    ax.set_xlabel(tx["xlabel_honest"] if bc == "bad_case" else tx["xlabel"])
+    if bc == "bad_case" and (f.bad_case_source == "stress").any():
+        ax.plot([], [], "o", color="#2a6fdb", mfc="white", ms=6, ls="none", label=tx["stress_points"])
     ax.set_ylabel(tx["ylabel"])
     ax.set_title(tx["title"])
     ax.legend(fontsize=8, frameon=False, loc="upper right")

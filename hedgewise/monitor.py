@@ -134,6 +134,29 @@ def position_costs(a: hw.Analysis, plan: dict, as_of: pd.Timestamp) -> dict[str,
     return out
 
 
+def position_shock(a: hw.Analysis, df: pd.DataFrame, plan: dict, as_of: pd.Timestamp) -> dict[str, float]:
+    """The same three positions in the 'shock as big as 2021->2022, from today' scenario (the rest of the target
+    bought at today's fixed price, as in the stress test). Empty-price data -> zeros (bad case = the model's)."""
+    from .strategies import _delivery_vol, shock_prices
+
+    try:
+        p = shock_prices(a, df)
+    except ValueError:
+        return {"variable": 0.0, "now": 0.0, "plan": 0.0}
+    vol = _delivery_vol(a)
+    bought = [t for t in plan["tranches"] if pd.Timestamp(t["date"]) <= as_of]
+    b = sum(t["share"] for t in bought)
+    rest = max(0.0, plan["target_share"] - b)
+    out = {"variable": 0.0, "now": 0.0, "plan": 0.0}
+    for c in ("gas", "power"):
+        var = float(vol[c] @ p[c])
+        fixed = sum(t["share"] * t[f"{c}_eur_mwh"] for t in bought) * vol[c].sum()
+        out["variable"] += var
+        out["now"] += fixed + (1 - b) * var
+        out["plan"] += fixed + rest * a.fwd_now[c] * vol[c].sum() + (1 - b - rest) * var
+    return out
+
+
 def _es(x: np.ndarray) -> float:
     q = np.quantile(x, 0.95)
     return float(x[x >= q].mean())
@@ -158,11 +181,22 @@ def run_client(
     ds = pd.Timestamp(int(plan["delivery_year"]), 1, 1)
     if as_of >= ds:
         raise ValueError(f"{client['name']}: delivery year {ds.year} has started; set up next year's plan")
-    m = hw.fit(df, as_of)
-    budget = client.get("budget")
-    a = hw.analyse(m, client["company"], ds, n_paths, DEFAULT_SEED, client.get("risk_aversion", 0.5), budget=budget)
+    m = hw.fit(df.loc[:as_of], as_of)
+    a = hw.recommend(
+        m,
+        client["company"],
+        df.loc[:as_of],
+        ds,
+        n_paths,
+        DEFAULT_SEED,
+        client.get("rule", "ladder"),
+        client.get("risk_aversion", 0.5),
+        client.get("budget"),
+        plan.get("previous_season_target"),
+    )
     st = plan_status(plan, as_of)
     costs = position_costs(a, plan, as_of)
+    shock = position_shock(a, df.loc[:as_of], plan, as_of)
     row = {
         "run_date": str(as_of.date()),
         "data_date": str(min(as_of, df.index.max()).date()),  # the last price the model saw
@@ -174,10 +208,10 @@ def run_client(
         "gas_fixed": float(a.fwd_now["gas"]),
         "power_fixed": float(a.fwd_now["power"]),
         "expected_now": float(costs["now"].mean()),
-        "bad_case_now": _es(costs["now"]),
+        "bad_case_now": max(_es(costs["now"]), shock["now"]),  # honest bad case: never below the 2021->22 shock
         "expected_plan": float(costs["plan"].mean()),
-        "bad_case_plan": _es(costs["plan"]),
-        "bad_case_variable": _es(costs["variable"]),
+        "bad_case_plan": max(_es(costs["plan"]), shock["plan"]),
+        "bad_case_variable": max(_es(costs["variable"]), shock["variable"]),
     }
     history_dir.mkdir(parents=True, exist_ok=True)
     hpath = history_dir / f"{slug(client['name'])}.csv"
@@ -227,8 +261,9 @@ TXT = {
         "electricity {p} per MWh). That brings you to {after} of the {target} target.",
         "nothing": "Nothing to buy this month: you have bought {b}, on plan ({p} planned so far).",
         "finished": "The buying season for {year} is over: {b} of your volume is fixed ({target} target).",
-        "model": "For information: with today's prices the model would advise {m} (your agreed target: {target}). "
-        "The plan doesn't change by itself; let's discuss it if the gap stays.",
+        "model": "For information: with today's prices the HedgeWise ladder would set the target at {m} (your agreed "
+        "target: {target}). The plan doesn't change by itself; let's discuss it if the gap stays. The bad case is "
+        "never lower than a repeat of the 2021->2022 price shock.",
         "changed_h": "What changed since {prev}",
         "first": "This is the first update: from next month you'll see what changed.",
         "row_bad": "Bad case for {year} with what you've bought so far",
@@ -267,8 +302,9 @@ TXT = {
         "(gas {g}, elektriciteit {p} per MWh). Dan zit u op {after} van het doel van {target}.",
         "nothing": "Deze maand niets te kopen: u heeft {b} gekocht, volgens plan ({p} gepland tot nu).",
         "finished": "Het inkoopseizoen voor {year} is voorbij: {b} van uw volume ligt vast (doel {target}).",
-        "model": "Ter informatie: met de prijzen van vandaag zou het model {m} adviseren (uw afgesproken doel: "
-        "{target}). Het plan verandert niet vanzelf; laten we het bespreken als het verschil blijft.",
+        "model": "Ter informatie: met de prijzen van vandaag zou de HedgeWise-ladder het doel op {m} zetten (uw "
+        "afgesproken doel: {target}). Het plan verandert niet vanzelf; laten we het bespreken als het verschil blijft. "
+        "Het slechte scenario is nooit lager dan een herhaling van de prijsschok van 2021->2022.",
         "changed_h": "Wat er veranderde sinds {prev}",
         "first": "Dit is de eerste update: vanaf volgende maand ziet u wat er veranderde.",
         "row_bad": "Slecht scenario {year} met wat u al heeft gekocht",

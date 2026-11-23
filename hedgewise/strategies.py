@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import dataclasses
+import re
 
 import numpy as np
 import pandas as pd
@@ -12,6 +13,7 @@ from .company import Company
 from .models import DAYS_PER_YEAR, FittedModel, PowerModel
 from .settings import (
     ANCHOR_TO_FORWARD,
+    BACKTEST,
     BUDGET_LOOKBACK_DAYS,
     BUDGET_MARGIN,
     DEFAULT_PATHS,
@@ -130,6 +132,7 @@ class Analysis:
     frontier: pd.DataFrame
     recommendation: dict
     sims: dict
+    bad_case_source: dict = dataclasses.field(default_factory=dict)  # strategy -> "model" / "stress" (see below)
 
 
 def analyse(
@@ -431,20 +434,29 @@ def trailing_bill(history: pd.DataFrame, company: Company) -> float:
 
 
 def recommendation_text(a: Analysis) -> str:
-    """The recommendation as four plain-English lines (CLI and dashboard)."""
+    """The recommendation as plain-English lines (CLI)."""
     r, t = a.recommendation, a.table
     var_row, hw_row = t.loc["All variable"], t.iloc[-1]
+    bad_var, src_var = bad_case(a, "All variable")
+    bad_plan, src_plan = bad_case(a)
     n = len(a.tranches)
+    if r["mode"] == "budget":
+        head = (
+            f"Budget EUR {r['budget'] / 1e6:.2f}m: the smallest hedge that keeps the bill within budget in 95% "
+            "of scenarios is to "
+        )
+    elif r.get("rule") == "ladder":
+        head = (
+            f"Recommendation (HedgeWise ladder, pre-registered {BACKTEST['ladder_preregistered']}; model target "
+            f"{r['model_target']:.0%}, kept between {LADDER_BASE:.0%} and {r['ladder_cap']:.0%}): "
+        )
+    else:
+        head = f"Model-only recommendation (risk aversion {r['risk_aversion']}; not recommended, see RESULTS.md): "
     lines = [
         f"Delivery {a.delivery_start:%b %Y} - {(a.delivery_start + pd.DateOffset(months=11)):%b %Y}, {a.company.name}",
-        f"If you stay fully variable: expected bill EUR {var_row.expected / 1e6:.2f}m, but in the worst 5% of "
-        f"scenarios EUR {var_row.es95 / 1e6:.2f}m on average (worst simulated: EUR {var_row.worst / 1e6:.2f}m).",
-        (
-            f"Budget EUR {r['budget'] / 1e6:.2f}m: the smallest hedge that keeps the bill within budget in 95% of "
-            f"scenarios is to "
-            if r["mode"] == "budget"
-            else f"Recommendation (risk aversion {r['risk_aversion']}): "
-        )
+        f"If you stay fully variable: expected bill EUR {var_row.expected / 1e6:.2f}m; bad case EUR "
+        f"{bad_var / 1e6:.2f}m ({'2021->22-size shock' if src_var == 'stress' else 'model, worst 5% average'}).",
+        head
         + (
             f"fix {r['hedge_gas']:.0%} of next year's gas and power, "
             if np.isclose(r["hedge_gas"], r["hedge_power"])
@@ -456,15 +468,25 @@ def recommendation_text(a: Analysis) -> str:
             else f"spread over {n} monthly tranches ({', '.join(d[:7] for d in r['tranches'])}); "
             f"buy about {r['buy_now_gas']:.0%} gas / {r['buy_now_power']:.0%} power this month."
         ),
-        f"That cuts the bad-case bill (ES95) by EUR {(var_row.es95 - hw_row.es95) / 1e3:,.0f}k "
+        f"That cuts the bad case by EUR {(bad_var - bad_plan) / 1e3:,.0f}k "
         + (
             f"for an expected extra cost of EUR {(hw_row.expected - var_row.expected) / 1e3:,.0f}k "
             "(the hedging premium)."
             if hw_row.expected >= var_row.expected
-            else f"and is also EUR {(var_row.expected - hw_row.expected) / 1e3:,.0f}k cheaper in expectation "
-            f"(today's fixed price is below the model's expected spot price)."
+            else f"and is also EUR {(var_row.expected - hw_row.expected) / 1e3:,.0f}k cheaper in expectation."
         ),
     ]
+    nx = r.get("next_year")
+    if nx:
+        lines.append(
+            f"Also start {nx['year']}: buy {nx['buy_now']:.0%} of its volume this month, {nx['base']:.0%} by "
+            "December (the ladder's base layer)."
+        )
+    if "bad_case" in t:
+        lines.append(
+            "The bad case is never lower than a repeat of the 2021->2022 price shock: the model's 12-month "
+            "ranges were too narrow before that crisis (72% instead of 90% of outcomes)."
+        )
     return "\n".join(lines)
 
 
@@ -474,7 +496,8 @@ def frontier_scale(a: Analysis) -> tuple[float, float]:
     f = a.frontier
     f = f[(f.execution == r["execution"]) & np.isclose(f.hedge_gas, f.hedge_power)].sort_values("hedge_gas")
     lo, hi = f.iloc[0], f.iloc[-1]
-    return float(hi.expected - lo.expected), float(lo.es95 - hi.es95)
+    bc = "bad_case" if "bad_case" in f else "es95"
+    return float(hi.expected - lo.expected), float(lo[bc] - hi[bc])
 
 
 def frontier_scale_sentence(a: Analysis, lang: str = "en") -> str:
@@ -493,3 +516,191 @@ def frontier_scale_sentence(a: Analysis, lang: str = "en") -> str:
         return f"€{v / 1e3:,.0f}k" if abs(v) < 1e6 else f"€{v / 1e6:.2f}m"
 
     return f"Fixing everything costs {k(x)} more on average and cuts the bad case by {k(y)}."
+
+
+# --------------------------------------------------------------------------------------------
+# The HedgeWise ladder: the pre-registered rule (PREREGISTRATION.md)
+# --------------------------------------------------------------------------------------------
+LADDER_BASE = BACKTEST["ladder_base"]  # 40% bought in monthly tranches in H2 of Y-2
+LADDER_STEP = BACKTEST["ladder_max_step"]  # target <= previous season's target + 10 points
+LADDER_GAMMA = BACKTEST["policy_gamma"]  # the model target comes from the optimiser at risk aversion 0.5
+MODEL_ONLY = "Model-only"  # label of the plain optimiser column once the ladder is the plan
+
+
+def _delivery_vol(a: Analysis) -> dict[str, np.ndarray]:
+    order = [(a.delivery_start + pd.DateOffset(months=i)).month - 1 for i in range(12)]
+    return {"gas": a.company.gas_mwh[order], "power": a.company.power_mwh[order]}
+
+
+def hedge_costs(a: Analysis, hg: float, hp: float, execution: str = "tranches") -> np.ndarray:
+    """Bill per scenario when hg of gas and hp of power are fixed ('now' at today's fixed price, 'tranches' at the
+    average of the monthly tranche prices) and the rest floats: the same formula as analyse()."""
+    vol = _delivery_vol(a)
+    fixed = a.fwd_now if execution == "now" else a.fwd_tranche_avg
+    total = 0.0
+    for c, h in (("gas", hg), ("power", hp)):
+        total = total + (1 - h) * (vol[c] @ a.spot_month[c]) + h * vol[c].sum() * np.asarray(fixed[c])
+    return np.asarray(total * np.ones(a.spot_month["gas"].shape[1]))
+
+
+def _table(costs: dict) -> pd.DataFrame:
+    t = pd.DataFrame({k: risk_stats(v) for k, v in costs.items()}).T
+    t["cost_at_risk"] = t["es95"] - t["expected"]
+    return t
+
+
+def apply_ladder(a: Analysis, prev_target: float | None = None) -> Analysis:
+    """Make the HedgeWise ladder the recommendation (pre-registered rule, PREREGISTRATION.md):
+    target = the optimiser's share at risk aversion 0.5, but at least the 40% base layer and at most the previous
+    season's target + 10 points (no previous season: 40% + 10 = 50%), bought in equal monthly tranches. If today is
+    in the second half of the year before delivery, also start next year's 40% base layer.
+    The optimiser's own answer stays in the table as 'Model-only' (not recommended: procyclical, RESULTS.md).
+    Budget mode is a different goal and is returned unchanged."""
+    r = a.recommendation
+    if r["mode"] == "budget":
+        return a
+    if not np.isclose(r["risk_aversion"], LADDER_GAMMA):
+        raise ValueError(f"the ladder uses the model target at risk aversion {LADDER_GAMMA}; analyse with that")
+    raw = float(r["hedge_gas"])
+    cap = (LADDER_BASE if prev_target is None else float(prev_target)) + LADDER_STEP
+    target = float(np.round(min(1.0, max(LADDER_BASE, min(raw, cap))) / HEDGE_GRID_STEP) * HEDGE_GRID_STEP)
+    n = len(a.tranches)
+    ex = "now" if n == 1 else "tranches"
+    costs = {}
+    for k, v in a.costs.items():  # rename the optimiser's column
+        costs[k.replace("HedgeWise (", f"{MODEL_ONLY} (", 1) if k.startswith("HedgeWise (") else k] = v
+    label = "now" if ex == "now" else f"{n} tranches"
+    costs[f"HedgeWise ladder ({target:.0%}, {label})"] = hedge_costs(a, target, target, ex)
+    as_of = a.model.as_of
+    nxt = None
+    if as_of.year == a.delivery_start.year - 1 and as_of.month >= 7:  # H2 of Y-2 for the year after
+        months_left = 12 - as_of.month + 1
+        nxt = {
+            "year": a.delivery_start.year + 1,
+            "base": LADDER_BASE,
+            "buy_now": LADDER_BASE / months_left,
+            "months_left": months_left,
+        }
+    rec = {
+        **r,
+        "hedge_gas": target,
+        "hedge_power": target,
+        "execution": ex,
+        "tranches": [str(t.date()) for t in a.tranches] if ex == "tranches" else [str(a.tranches[0].date())],
+        "buy_now_gas": target / (1 if ex == "now" else n),
+        "buy_now_power": target / (1 if ex == "now" else n),
+        "rule": "ladder",
+        "model_target": raw,
+        "ladder_cap": cap,
+        "prev_target": prev_target,
+        "next_year": nxt,
+        "model_only": {"hedge_gas": r["hedge_gas"], "hedge_power": r["hedge_power"], "execution": r["execution"]},
+    }
+    return dataclasses.replace(a, costs=costs, table=_table(costs), recommendation=rec)
+
+
+# --------------------------------------------------------------------------------------------
+# An honest bad case: never lower than a repeat of the 2021->2022 shock
+# --------------------------------------------------------------------------------------------
+def shock_prices(a: Analysis, df: pd.DataFrame) -> dict[str, np.ndarray]:
+    """Monthly prices (delivery order) in the 'shock as big as 2021->2022, from today' scenario."""
+    hp_ = _stress_prices(df)
+    cal = [(a.delivery_start + pd.DateOffset(months=i)).month - 1 for i in range(12)]
+    return {
+        c: a.fwd_now[c] * (hp_[c]["avg_2022"] / hp_[c]["avg_2021"]) * hp_[c]["monthly_2022"][cal] / hp_[c]["avg_2022"]
+        for c in ("gas", "power")
+    }
+
+
+def shock_bill(a: Analysis, df: pd.DataFrame, hg: float, hp: float) -> float:
+    """The bill in the 'shock as big as 2021->2022, from today' stress scenario with hg / hp fixed at today's
+    fixed price (the same definition as stress_test scenario b)."""
+    prices = shock_prices(a, df)
+    vol = _delivery_vol(a)
+    return sum(
+        (1 - h) * float(vol[c] @ prices[c]) + h * float(vol[c].sum() * a.fwd_now[c])
+        for c, h in (("gas", hg), ("power", hp))
+    )
+
+
+def _column_hedge(name: str, r: dict) -> tuple[float, float]:
+    """The fixed shares behind a strategy column (stress scenario: fixed part at today's fixed price)."""
+    m = re.search(r"gas (\d+)%, power (\d+)%", name)
+    if m:
+        return int(m[1]) / 100, int(m[2]) / 100
+    m = re.search(r"ladder \((\d+)%", name)
+    if m:
+        return int(m[1]) / 100, int(m[1]) / 100
+    m = re.search(r"(\d+)%", name)
+    return (int(m[1]) / 100,) * 2 if m else (0.0, 0.0)
+
+
+def honest_bad_case(a: Analysis, df: pd.DataFrame) -> Analysis:
+    """Add the bad case shown to clients: the HIGHER of the model's ES95 and the 2021->2022-shock bill, per strategy
+    (table) and per share fixed (frontier), with its source ('model' or 'stress'). Why: the model's 12-month ranges
+    were too narrow before the 2021-22 crisis (72% coverage instead of 90%, RESULTS.md). The recommendation is not
+    recomputed: the default objective is mean-variance and doesn't use the bad case."""
+    t = a.table.copy()
+    shock = [shock_bill(a, df, *_column_hedge(k, a.recommendation)) for k in t.index]
+    t["shock"] = shock
+    t["bad_case"] = np.maximum(t["es95"], t["shock"])
+    src = {
+        k: ("stress" if sh > es * (1 + 1e-9) else "model")
+        for k, sh, es in zip(t.index, t["shock"], t["es95"], strict=True)
+    }
+    f = a.frontier.copy()
+    f["shock"] = [shock_bill(a, df, hg, hp) for hg, hp in zip(f.hedge_gas, f.hedge_power, strict=True)]
+    f["bad_case"] = np.maximum(f["es95"], f["shock"])
+    f["bad_case_source"] = np.where(f["shock"] > f["es95"] * (1 + 1e-9), "stress", "model")
+    return dataclasses.replace(a, table=t, frontier=f, bad_case_source=src)
+
+
+def bad_case(a: Analysis, row: str | None = None) -> tuple[float, str]:
+    """(value, source) of the bad case shown for a strategy row (default: the recommendation = last row);
+    the plain ES95 ('model') if honest_bad_case() was not applied."""
+    r = a.table.loc[row] if row else a.table.iloc[-1]
+    if "bad_case" in a.table:
+        return float(r["bad_case"]), a.bad_case_source[r.name]
+    return float(r["es95"]), "model"
+
+
+RULES = ("ladder", "model-only")
+
+
+def recommend(
+    m: FittedModel,
+    company: Company,
+    df: pd.DataFrame,
+    delivery_start: DateLike | None = None,
+    n_paths: int = DEFAULT_PATHS,
+    seed: int = DEFAULT_SEED,
+    rule: str = "ladder",
+    risk_aversion: float = DEFAULT_RISK_AVERSION,
+    budget: float | str | None = None,
+    prev_target: float | None = None,
+    sims: dict | None = None,
+    allow_timing: bool = False,
+) -> Analysis:
+    """The analysis a client sees. rule='ladder' (default, pre-registered): the optimiser at risk aversion 0.5 gives
+    the model target and apply_ladder() turns it into the plan; rule='model-only': the optimiser's own answer at
+    `risk_aversion` (not recommended: procyclical); a budget overrides both. The bad case is the honest one
+    (honest_bad_case) whenever the 2021-22 prices are in the data."""
+    if rule not in RULES:
+        raise ValueError(f"rule must be one of {RULES}")
+    ladder = rule == "ladder" and budget is None
+    gamma = LADDER_GAMMA if ladder else risk_aversion
+    a = analyse(m, company, delivery_start, n_paths, seed, gamma, sims=sims, allow_timing=allow_timing, budget=budget)
+    if ladder:
+        a = apply_ladder(a, prev_target)
+    elif budget is None:  # model-only: label the optimiser's column as such (not recommended, RESULTS.md)
+        costs = {
+            (k.replace("HedgeWise (", f"{MODEL_ONLY} (", 1) if k.startswith("HedgeWise (") else k): v
+            for k, v in a.costs.items()
+        }
+        a = dataclasses.replace(
+            a, costs=costs, table=_table(costs), recommendation={**a.recommendation, "rule": "model-only"}
+        )
+    try:
+        return honest_bad_case(a, df)
+    except ValueError:  # no 2021-22 prices (demo data): the model's ES95 only
+        return a

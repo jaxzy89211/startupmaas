@@ -31,6 +31,14 @@ TEXT = {
         "stress_h": "What if 2022 happens again?",
         "stress_note": "Historical stress scenarios, not forecasts. Left: 2022 monthly prices as they were. Right: "
         "today's fixed price × (2022 avg ÷ 2021 avg), 2022 monthly pattern. Fixed share at today's price.",
+        "honest_note": "Our model's 12-month ranges were too narrow before the 2021-22 crisis (they held 72% of "
+        "outcomes instead of 90%), so the bad case is never lower than a repeat of the 2021->2022 price shock.",
+        "bad_src": {"model": "model", "stress": "2021->22 shock"},
+        "bad_from": "Bad case <font size=8>(source: {src})</font>",
+        "rule_ladder": "Rule: the HedgeWise ladder (pre-registered {date}): the model says {m}; the ladder keeps the "
+        "share between {base} and last season + 10 points ({cap}).",
+        "next_year": "Also start {year}: buy <b>{now}</b> of {year}'s volume this month, {base} by December "
+        "(the ladder's base layer).",
         "green": "Green investments:",
         "audit_h": "Your past contracts vs the strategies (realised prices)",
         "audit_intro": "What you actually paid for gas and power (commodity cost only), next to what the same "
@@ -75,6 +83,15 @@ TEXT = {
         "stress_h": "Wat als 2022 zich herhaalt?",
         "stress_note": "Historische stressscenario's, geen voorspellingen. Links: maandprijzen 2022 zoals ze waren. "
         "Rechts: vaste prijs nu × (gem. 2022 ÷ gem. 2021), maandpatroon 2022. Vast deel tegen de prijs van nu.",
+        "honest_note": "De 12-maandsbandbreedtes van ons model waren te smal vóór de crisis van 2021-22 (ze bevatten "
+        "72% van de uitkomsten in plaats van 90%), dus het slechte scenario is nooit lager dan een herhaling van de "
+        "prijsschok van 2021->2022.",
+        "bad_src": {"model": "model", "stress": "schok als 2021->22"},
+        "bad_from": "Slecht scenario <font size=8>(bron: {src})</font>",
+        "rule_ladder": "Regel: de HedgeWise-ladder (vooraf vastgelegd {date}): het model zegt {m}; de ladder houdt het "
+        "aandeel tussen {base} en vorig seizoen + 10 punten ({cap}).",
+        "next_year": "Begin ook aan {year}: koop deze maand <b>{now}</b> van het volume voor {year}, {base} vóór "
+        "december (de basislaag van de ladder).",
         "green": "Groene investeringen:",
         "audit_h": "Uw contracten vs de strategieën (gerealiseerde prijzen)",
         "audit_intro": "Wat u echt betaalde voor gas en stroom (alleen de energie zelf), naast wat hetzelfde verbruik "
@@ -99,6 +116,9 @@ TEXT = {
             "ylabel": "Verwachte rekening (€ mln)",
             "pick": "HedgeWise-advies: {h} vastzetten (risicoaversie {g})",
             "pick_budget": "HedgeWise-advies: {h} vastzetten (budget)",
+            "pick_ladder": "HedgeWise-ladder: {h} vastzetten",
+            "xlabel_honest": "Slecht scenario: de hoogste van het model (5% duurste) en een schok als 2021->22 (€ mln)",
+            "stress_points": "open punt = slecht scenario uit de schok",
             "tradeoff": "Elke extra 10% vast: gemiddeld ca. € {e}k meer,\n€ {es}k minder in het slechte scenario",
             "decimal": ",",
         },
@@ -107,6 +127,7 @@ TEXT = {
 TEXT["en"]["chart"] = {
     "xlabel": "Bad case: average of the worst 5% of scenarios (€ m)",
     "ylabel": "Expected bill (€ m)",
+    "xlabel_honest": "Bad case: the worse of the model's worst 5% and a 2021->22-size shock (€ m)",
 }
 NL_MONTHS = [
     "januari",
@@ -142,3 +163,24 @@ def money(x: float, lang: str) -> str:
 def pct(x: float) -> str:
     """0.55 -> '55%'."""
     return f"{x:.0%}"
+
+
+def ladder_lines(a: object, lang: str) -> list[str]:
+    """The rule line and (in H2 of the year before) next year's base-layer line, if the ladder is the plan."""
+    from .settings import BACKTEST
+
+    r, T = a.recommendation, TEXT[lang]
+    if r.get("rule") != "ladder":
+        return []
+    out = [
+        T["rule_ladder"].format(
+            date=BACKTEST["ladder_preregistered"],
+            m=pct(r["model_target"]),
+            base=pct(BACKTEST["ladder_base"]),
+            cap=pct(r["ladder_cap"]),
+        )
+    ]
+    nx = r.get("next_year")
+    if nx:
+        out.append(T["next_year"].format(year=nx["year"], now=pct(nx["buy_now"]), base=pct(nx["base"])))
+    return out

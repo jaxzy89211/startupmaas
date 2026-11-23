@@ -251,39 +251,55 @@ def pdf_input(T: dict, name: str, sector: str) -> tuple[hw.Company | None, list[
 
 
 def run_analysis(
-    company: hw.Company, T: dict, as_of: str, n: int, lam: float, budget: float | str | None, allow_timing: bool
+    company: hw.Company,
+    T: dict,
+    as_of: str,
+    n: int,
+    lam: float,
+    budget: float | str | None,
+    allow_timing: bool,
+    rule: str = "ladder",
+    prev_target: float | None = None,
 ) -> tuple:
-    """Fit, simulate, analyse (all cached where possible). Returns (model, analysis, stress, cache key)."""
+    """Fit, simulate, recommend (ladder by default; honest bad case). Returns (model, analysis, stress, cache key)."""
     ds = str(pd.Timestamp(year=pd.Timestamp(as_of).year + 1, month=1, day=1).date())
     with st.spinner(T["spinner"]):
         m = fitted(as_of)
         s = sims(as_of, ds, n, DEFAULT_SEED)
-        a = hw.analyse(m, company, ds, n, DEFAULT_SEED, lam, sims=s, allow_timing=allow_timing, budget=budget)
+        a = hw.recommend(
+            m, company, load(), ds, n, DEFAULT_SEED, rule, lam, budget, prev_target, sims=s, allow_timing=allow_timing
+        )
     try:
         stress = hw.stress_test(a, load())
     except ValueError:
         stress = None
-    key = (as_of, ds, n, lam, budget, allow_timing, company.name, company.gas_m3, company.power_kwh)
+    key = (as_of, ds, n, lam, budget, allow_timing, rule, prev_target, company.name, company.gas_m3, company.power_kwh)
     return m, a, stress, key
 
 
 def show_headline(a: hw.Analysis, T: dict, lang: str) -> None:
     """Four metrics and the advice in words."""
-    var_row, hw_row = a.table.loc["All variable"], a.table.iloc[-1]
+    var_row = a.table.loc["All variable"]
+    bad_var, src_var = hw.bad_case(a, "All variable")
+    bad_plan, src_plan = hw.bad_case(a)
     c1, c2, c3, c4 = st.columns(4)
     c1.metric(T["m_expected"], eur_m(var_row.expected, lang))
-    c2.metric(T["m_bad"], eur_m(var_row.es95, lang), help=T["m_bad_help"])
+    c2.metric(T["m_bad"], eur_m(bad_var, lang), help=T["m_bad_help"])
+    c2.caption(T[f"src_{src_var}"])
     c3.metric(
         T["m_bad_hw"],
-        eur_m(hw_row.es95, lang),
-        delta="-" + eur_m(var_row.es95 - hw_row.es95, lang),
+        eur_m(bad_plan, lang),
+        delta="-" + eur_m(bad_var - bad_plan, lang),
         delta_color="inverse",
     )
+    c3.caption(T[f"src_{src_plan}"])
     rg, rp = a.recommendation["hedge_gas"], a.recommendation["hedge_power"]
     c4.metric(
         T["m_share"], f"{rg:.0%}" if np.isclose(rg, rp) else T["share_split"].format(g=f"{rg:.0%}", p=f"{rp:.0%}")
     )
     st.info(recommendation_md(a, lang))
+    if "bad_case" in a.table:
+        st.caption(REPORT_TEXT[lang]["honest_note"])
 
 
 def show_stress(stress: dict | None, key: tuple, T: dict, lang: str) -> None:
@@ -547,12 +563,15 @@ with st.sidebar:
             T["as_of"], pd.Timestamp("2021-09-30"), min_value=pd.Timestamp("2020-01-31"), max_value=df.index.max()
         )
     )
-    mode = st.radio(T["goal"], ["goal_balance", "goal_budget"], format_func=lambda k: T[k], key="goal")
-    if mode == "goal_balance":
+    mode = st.radio(T["goal"], ["goal_ladder", "goal_model", "goal_budget"], format_func=lambda k: T[k], key="goal")
+    rule, prev_target, lam, budget = "ladder", None, DEFAULT_RISK_AVERSION, None
+    if mode == "goal_ladder":
+        pt = st.number_input(T["prev_target"], 0, 100, 0, step=5, key="prev_target")
+        prev_target = pt / 100 if pt else None
+    elif mode == "goal_model":
+        rule = "model-only"
         lam = st.slider(T["risk"], 0.0, 1.0, DEFAULT_RISK_AVERSION, 0.1, help=T["risk_help"], key="risk")
-        budget = None
     else:
-        lam = DEFAULT_RISK_AVERSION
         b = st.number_input(T["budget"], 0, 100_000_000, 0, step=50_000, key="budget")
         budget = "auto" if b == 0 else b
     allow_timing = st.checkbox(T["timing"], False, key="timing")
@@ -561,9 +580,9 @@ with st.sidebar:
 tab_today, tab_audit, tab_tracker = st.tabs([T["tab_today"], T["tab_audit"], T["tab_tracker"]])
 
 with tab_today:
-    m, a, stress, key = run_analysis(company, T, as_of, n, lam, budget, allow_timing)
+    m, a, stress, key = run_analysis(company, T, as_of, n, lam, budget, allow_timing, rule, prev_target)
     var_row = a.table.loc["All variable"]
-    green_t = gr.evaluate(a, inv)[0] if inv.any() else None
+    green_t = gr.evaluate(a, inv, df=load())[0] if inv.any() else None
     show_headline(a, T, lang)
     rc1, rc2, _ = st.columns([1, 2, 3])
     rep_lang = rc1.radio(T["report_lang"], ["EN", "NL"], index=["en", "nl"].index(lang), horizontal=True).lower()
@@ -572,7 +591,7 @@ with tab_today:
     extra = ()
     if green_t is not None:
         extra = tuple(
-            (T["plan_plus"].format(inv=r.investment if lang == "en" else r.label_nl), r.es95, r.expected)
+            (T["plan_plus"].format(inv=r.investment if lang == "en" else r.label_nl), r.bad_case, r.expected)
             for r in green_t.itertuples()
         )
     st.image(frontier_png(key, lang, a, extra), width="stretch")
@@ -594,7 +613,10 @@ with tab_today:
         )
         st.warning(
             T["what_happened"].format(
-                y=ds.year, r=eur_m(rb, lang), e=eur_m(var_row.expected, lang), b=eur_m(var_row.es95, lang)
+                y=ds.year,
+                r=eur_m(rb, lang),
+                e=eur_m(var_row.expected, lang),
+                b=eur_m(hw.bad_case(a, "All variable")[0], lang),
             )
         )
 
