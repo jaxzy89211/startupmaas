@@ -1,9 +1,14 @@
 """
 HedgeWise live demo  -  run with:   streamlit run app.py
 Consumption in  ->  worst-case bill and recommendation out.
+
+Every text is in English and Dutch (hedgewise/app_text.py; the switch is at the top of the sidebar).
+"Interview mode" hides the model settings and walks through: company name -> energy use -> past contracts
+(optional) -> results -> PDF.
 """
 
 import io
+import threading
 
 import numpy as np
 import pandas as pd
@@ -13,12 +18,21 @@ import hedgewise as hw
 from hedgewise import audit as au
 from hedgewise import company_input as ci
 from hedgewise import green as gr
+from hedgewise.app_text import UI, eur_m, number, recommendation_md, sector_label, strategy_table, warning_text
 from hedgewise.naming import report_path
 from hedgewise.settings import APP, DEFAULT_RISK_AVERSION, DEFAULT_SEED
+from hedgewise.texts import TEXT as REPORT_TEXT
 
 st.set_page_config(page_title="HedgeWise", page_icon="⚡", layout="wide")
 
+# matplotlib's pyplot keeps global state and is not thread-safe; Streamlit runs every browser session in its own
+# thread, so two people drawing a chart at the same moment could get each other's axes. One chart at a time.
+PLOT_LOCK = threading.Lock()
 
+
+# --------------------------------------------------------------------------------------------
+# Cached computations
+# --------------------------------------------------------------------------------------------
 @st.cache_data(show_spinner=False)
 def load() -> pd.DataFrame:
     """Price history from data/ (cached for all sessions)."""
@@ -31,34 +45,6 @@ def fitted(as_of: str) -> hw.FittedModel:
     return hw.fit(load(), as_of)
 
 
-@st.cache_data(show_spinner=False, max_entries=64)
-def analysis_png(key: tuple, _a: hw.Analysis) -> bytes:
-    """The 4-panel analysis chart as PNG bytes, cached per input combination (`key`; `_a` is not hashed)."""
-    buf = io.BytesIO()  # in memory: no shared file when several people use the demo at once
-    hw.plot_analysis(_a, buf)
-    return buf.getvalue()
-
-
-@st.cache_data(show_spinner=False, max_entries=64)
-def stress_png(key: tuple, _stress: dict) -> bytes:
-    """The stress-scenario chart as PNG bytes, cached per input combination."""
-    buf = io.BytesIO()
-    hw.plot_stress(_stress, buf)
-    return buf.getvalue()
-
-
-def report_pdf(
-    a: hw.Analysis, lang: str, stress: dict | None, audit: object | None = None, green: pd.DataFrame | None = None
-) -> bytes:
-    """The one-page PDF. Called only when someone clicks "Download" (Streamlit runs it on a separate thread,
-    outside the page script, so no Streamlit calls or caches in here); reportlab is imported only then."""
-    from hedgewise import report
-
-    buf = io.BytesIO()
-    report.make_report(a, buf, lang, stress=stress, audit=audit, green=green)
-    return buf.getvalue()
-
-
 @st.cache_resource(show_spinner=False)
 def sims(as_of: str, delivery_start: str, n: int, seed: int) -> dict:
     """Simulated price paths to the end of the delivery year (cached)."""
@@ -67,265 +53,33 @@ def sims(as_of: str, delivery_start: str, n: int, seed: int) -> dict:
     return hw.simulate(m, end, n, seed)
 
 
-df = load()
-st.title("⚡ HedgeWise")
-st.caption(
-    "How bad can next year's energy bill get, and how much should you fix? "
-    f"Prices: Dutch day-ahead power + TTF gas up to {df.index.max():%d %b %Y}. "
-    "Power data: Energy-Charts (CC BY 4.0, Bundesnetzagentur | SMARD.de)."
-)
-
-with st.sidebar:
-    st.header("Your company")
-    name = st.text_input("Name", "Limburg food processor")
-    source = st.radio(
-        "Consumption data",
-        ["Yearly totals + sector", "Upload bills (CSV / Excel)"],
-        help="Upload 12-24 months of bills or a supplier-portal export, or just enter yearly totals.",
-    )
-    sector = st.selectbox(
-        "Sector (seasonal profile)",
-        ci.SECTORS,
-        help="Used to spread yearly totals over the months and to fill 1-3 missing months. "
-        "The profiles are assumptions.",
-    )
-    company, notes = None, []
-    if source.startswith("Upload"):
-        up = st.file_uploader("Monthly bills or portal export", type=["csv", "txt", "xlsx", "xls"])
-        if up is not None:
-            try:
-                table = ci.read_table(up)
-            except Exception as e:  # noqa: BLE001
-                st.error(f"Could not read this file: {e}")
-                st.stop()
-            guess = ci.detect_columns(table)
-            cols = list(table.columns)
-            none = "(none)"
-            st.caption("Check the columns HedgeWise found:")
-            dcol = st.selectbox("Month / date column", cols, index=cols.index(guess["date"]) if guess["date"] else 0)
-            gcol = st.selectbox(
-                "Gas column", [none] + cols, index=([none] + cols).index(guess["gas"]) if guess["gas"] else 0
-            )
-            gunit = st.selectbox("Gas unit", ci.GAS_UNITS, index=ci.GAS_UNITS.index(guess["gas_unit"]))
-            pcol = st.selectbox(
-                "Power column", [none] + cols, index=([none] + cols).index(guess["power"]) if guess["power"] else 0
-            )
-            punit = st.selectbox("Power unit", ci.POWER_UNITS, index=ci.POWER_UNITS.index(guess["power_unit"]))
-            mapping = {
-                "date": dcol,
-                "gas": None if gcol == none else gcol,
-                "power": None if pcol == none else pcol,
-                "gas_unit": gunit,
-                "power_unit": punit,
-            }
-            try:
-                res = ci.company_from_frame(table, mapping, name, sector)
-                company, notes = res.company, res.warnings
-            except ValueError as e:
-                st.error(str(e))
-                st.stop()
-            with st.expander("Preview of the file"):
-                st.dataframe(table.head(15), width="stretch")
-        else:
-            st.info("Upload a file, or switch to yearly totals.")
-            st.stop()
-    else:
-        gas = st.number_input("Gas per year", 0.0, 1e9, 1_200_000.0, step=50_000.0, format="%.0f")
-        gunit = st.selectbox("Gas unit", ci.GAS_UNITS, index=0)
-        power = st.number_input("Electricity per year", 0.0, 1e9, 5_000.0, step=250.0, format="%.0f")
-        punit = st.selectbox("Electricity unit", ci.POWER_UNITS, index=1)
-        try:
-            res = ci.from_yearly(gas, gunit, power, punit, sector, name)
-        except ValueError as e:
-            st.error(str(e))
-            st.stop()
-        company, notes = res.company, res.warnings
-    st.success(f"{sum(company.gas_m3):,.0f} m³ gas · {sum(company.power_kwh) / 1e3:,.0f} MWh power per year")
-    for n_ in notes:
-        st.warning(n_)
-    st.header("Green investments")
-    g_solar = st.number_input("Rooftop solar (kWp)", 0, 20_000, 0, step=100)
-    g_batt = st.number_input("Battery capacity (kWh)", 0, 50_000, 0, step=250)
-    g_bkw = st.number_input("Battery power (kW; 0 = half the capacity)", 0, 50_000, 0, step=250)
-    g_ppa = st.slider("PPA: share of the power volume (%)", 0, 100, 0, 5)
-    g_ppa_price = st.number_input("PPA price (EUR/MWh; 0 = today's fixed price)", 0.0, 1000.0, 0.0, step=5.0)
-    g_ppa_years = st.number_input("PPA length (years)", 1, 25, 10)
-    inv = gr.Investments(
-        solar_kwp=float(g_solar),
-        battery_kwh=float(g_batt),
-        battery_kw=float(g_bkw) or None,
-        ppa_share=g_ppa / 100,
-        ppa_price=g_ppa_price or None,
-        ppa_years=int(g_ppa_years),
-    )
-
-    st.header("Decision")
-    scenario = st.selectbox(
-        "Decision date", ["Today", "30 Jun 2021 (before the crisis)", "30 Jun 2022 (mid-crisis)", "Custom"]
-    )
-    as_of = {
-        "Today": str(df.index.max().date()),
-        "30 Jun 2021 (before the crisis)": "2021-06-30",
-        "30 Jun 2022 (mid-crisis)": "2022-06-30",
-    }.get(scenario)
-    if as_of is None:
-        as_of = str(
-            st.date_input(
-                "As of", pd.Timestamp("2021-09-30"), min_value=pd.Timestamp("2020-01-31"), max_value=df.index.max()
-            )
-        )
-    mode = st.radio("Goal", ["Balance cost and risk", "Stay within a budget"])
-    if mode == "Balance cost and risk":
-        lam, budget = (
-            st.slider(
-                "Risk aversion",
-                0.0,
-                1.0,
-                DEFAULT_RISK_AVERSION,
-                0.1,
-                help="0 = only care about the average bill, 1 = care a lot about bad years. "
-                "The chart 'Pick your trade-off' shows every other choice.",
-            ),
-            None,
-        )
-    else:
-        lam = DEFAULT_RISK_AVERSION
-        b = st.number_input("Energy budget (EUR, 0 = last 12 months + 20%)", 0, 100_000_000, 0, step=50_000)
-        budget = "auto" if b == 0 else b
-    allow_timing = st.checkbox("Allow fixing everything at once (market timing)", False)
-    n = st.select_slider("Scenarios", APP["scenario_choices"], APP["default_scenarios"])
-
-tab_today, tab_audit = st.tabs(["Today's risk", "Your past contracts / Uw contracten"])
-
-with tab_today:
-    ds = str(pd.Timestamp(year=pd.Timestamp(as_of).year + 1, month=1, day=1).date())
-    with st.spinner("Fitting GARCH-t model and simulating price scenarios ..."):
-        m = fitted(as_of)
-        s = sims(as_of, ds, n, DEFAULT_SEED)
-        a = hw.analyse(m, company, ds, n, DEFAULT_SEED, lam, sims=s, allow_timing=allow_timing, budget=budget)
-    # everything that changes the analysis: used as the cache key for the charts and the PDF
-    key = (as_of, ds, n, lam, budget, allow_timing, company.name, company.gas_m3, company.power_kwh)
-
-    var_row, hw_row = a.table.loc["All variable"], a.table.iloc[-1]
-    green_t, green_arr = gr.evaluate(a, inv) if inv.any() else (None, None)
-    try:
-        stress = hw.stress_test(a, df)
-    except ValueError:
-        stress = None
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Expected bill, all variable", f"€{var_row.expected / 1e6:.2f}m")
-    c2.metric("Bad case (avg worst 5%), all variable", f"€{var_row.es95 / 1e6:.2f}m")
-    c3.metric(
-        "Bad case with HedgeWise",
-        f"€{hw_row.es95 / 1e6:.2f}m",
-        delta=f"-€{(var_row.es95 - hw_row.es95) / 1e6:.2f}m",
-        delta_color="inverse",
-    )
-    rg, rp = a.recommendation["hedge_gas"], a.recommendation["hedge_power"]
-    c4.metric("Recommended share to fix", f"{rg:.0%}" if np.isclose(rg, rp) else f"gas {rg:.0%} · power {rp:.0%}")
-
-    st.info(hw.recommendation_text(a).replace("\n", "  \n"))
-
-    rc1, rc2, _ = st.columns([1, 2, 3])
-    rep_lang = rc1.radio("Report language", ["EN", "NL"], horizontal=True)
-    # page 2 with the past-contracts audit, if one was run for this same consumption profile
-    prev_audit = st.session_state.get("audit_result")
-    audit_page = None
-    if prev_audit is not None and prev_audit[0] == (company.gas_m3, company.power_kwh):
-        if rc1.checkbox("Add page 2: your past contracts", True):
-            audit_page = prev_audit[1]
-    rc2.download_button(
-        "Download report (PDF)",
-        lambda: report_pdf(a, rep_lang.lower(), stress, audit_page, green_t),  # built on click, not on every rerun
-        type="primary",
-        file_name=report_path(company.name, m.as_of).name,
-        mime="application/pdf",
-    )
-
-    st.image(analysis_png(key, a), width="stretch")
-    st.caption("Bottom left, the trade-off chart: " + hw.frontier_scale_sentence(a, "en"))
-
-    if stress:
-        st.subheader("What if 2022 happens again?")
-        sc1, sc2 = st.columns([3, 2])
-        sc1.image(stress_png(key, stress), width="stretch")
-        for sc in stress["scenarios"]:
-            b, p = sc["bills"], sc["avg_price"]
-            sc2.markdown(
-                f"**{sc['label']['en']}** (gas avg €{p['gas']:.0f}, power €{p['power']:.0f}/MWh): "
-                f"all variable €{b['All variable'] / 1e6:.2f}m · HedgeWise plan €{b['HedgeWise'] / 1e6:.2f}m · "
-                f"fix 100% €{b['Fix 100% now'] / 1e6:.2f}m"
-            )
-        sc2.caption(
-            "Historical stress scenarios, not forecasts. (a) The realised 2022 monthly prices exactly as they were. "
-            "(b) Today's fixed price × (2022 average / 2021 average) per commodity, with the 2022 monthly shape. "
-            "The hedged share is priced at today's fixed price."
-        )
-
-    st.subheader("Strategy comparison (EUR k)")
-    st.dataframe((a.table / 1e3).round(0).astype(int), width="stretch")
-
-    if pd.Timestamp(ds) + pd.DateOffset(years=1) <= df.index.max():
-        real = {c: df.loc[ds : str(pd.Timestamp(ds).year) + "-12-31", c] for c in ("gas", "power")}
-        rb = sum(
-            float(v @ real[c].groupby(real[c].index.month).mean().values)
-            for c, v in (("gas", company.gas_mwh), ("power", company.power_mwh))
-        )
-        st.warning(
-            f"What actually happened: the all-variable bill for {pd.Timestamp(ds).year} was "
-            f"**€{rb / 1e6:.2f}m** (model expected €{var_row.expected / 1e6:.2f}m, "
-            f"bad case €{var_row.es95 / 1e6:.2f}m)."
-        )
-
-    st.subheader("Green investments / Groene investeringen")
-    if green_t is None:
-        st.info(
-            "Choose rooftop solar, a battery or a PPA in the sidebar to see what each does to the expected and "
-            "the bad-case bill, and its payback in normal and crisis conditions."
-        )
-    else:
-        glang = st.radio("Language / Taal", ["EN", "NL"], horizontal=True, key="green_lang").lower()
-        st.markdown(gr.summary_text(green_t, glang))
-        show = green_t.assign(
-            name=green_t.investment if glang == "en" else green_t.label_nl,
-        ).set_index("name")[
-            ["cut_expected", "cut_es95", "capex", "saving_normal", "saving_crisis", "payback_normal", "payback_crisis"]
-        ]
-        cols = gr.TABLE_COLUMNS[glang]
-        show = show.rename(columns=cols)
-        st.dataframe(
-            show.style.format(
-                {c: "{:,.0f}" for c in list(cols.values())[:5]}
-                | {c: (lambda v: "–" if v is None or pd.isna(v) else f"{v:.1f}") for c in list(cols.values())[5:]}
-            ),
-            width="stretch",
-        )
-        gbuf = io.BytesIO()
-        hw.plot_frontier(
-            a,
-            path=gbuf,
-            extra_points=[("HedgeWise plan " + r.investment, r.es95, r.expected) for r in green_t.itertuples()],
-        )
-        st.image(gbuf.getvalue(), width="stretch")
-        with st.expander("Assumptions" if glang == "en" else "Aannames"):
-            for line in gr.assumptions_text(glang):
-                st.markdown("- " + line)
-
-    with st.expander("Model details"):
-        st.code(hw.describe(m))
-        src = a.recommendation["price_source"]
-        st.markdown("**Fixed prices used:** " + "; ".join(f"{k} €{a.fwd_now[k]:.1f}/MWh ({v})" for k, v in src.items()))
-        st.caption(
-            "Commodity cost only (no network tariffs, energy tax or supplier margin). Without data/forwards.csv the "
-            "fixed price is a stand-in for real forward prices: 30-day average spot (power seasonally adjusted) + 5%. "
-            "The simulated price level is anchored to the fixed price (minus the premium); the model supplies the "
-            "risk around it."
-        )
+@st.cache_data(show_spinner=False, max_entries=64)
+def analysis_png(key: tuple, _a: hw.Analysis) -> bytes:
+    """The 4-panel analysis chart as PNG bytes, cached per input combination (`key`; `_a` is not hashed)."""
+    buf = io.BytesIO()  # in memory: no shared file when several people use the demo at once
+    with PLOT_LOCK:
+        hw.plot_analysis(_a, buf)
+    return buf.getvalue()
 
 
-# --------------------------------------------------------------------------------------------
-# Tab 2: procurement audit ("what would HedgeWise have saved you?")
-# --------------------------------------------------------------------------------------------
+@st.cache_data(show_spinner=False, max_entries=64)
+def frontier_png(key: tuple, lang: str, _a: hw.Analysis, extra: tuple = ()) -> bytes:
+    """The trade-off chart in the chosen language (with green-investment points if any)."""
+    buf = io.BytesIO()
+    with PLOT_LOCK:
+        hw.plot_frontier(_a, path=buf, text=REPORT_TEXT[lang]["chart"], extra_points=list(extra) or None)
+    return buf.getvalue()
+
+
+@st.cache_data(show_spinner=False, max_entries=64)
+def stress_png(key: tuple, lang: str, _stress: dict) -> bytes:
+    """The stress-scenario chart as PNG bytes, cached per input combination and language."""
+    buf = io.BytesIO()
+    with PLOT_LOCK:
+        hw.plot_stress(_stress, buf, lang=lang)
+    return buf.getvalue()
+
+
 @st.cache_data(show_spinner=False, max_entries=16)
 def audit_strategies(gas_m3: tuple, power_kwh: tuple, last_year: int) -> pd.DataFrame:
     """The comparison strategies for this consumption profile (slow: re-fits at every decision date; cached)."""
@@ -333,60 +87,160 @@ def audit_strategies(gas_m3: tuple, power_kwh: tuple, last_year: int) -> pd.Data
     return au.strategy_costs(comp, last_year, load())
 
 
-AUDIT_TXT = {
-    "en": {
-        "intro": "Enter what you actually bought per delivery year: the share fixed, the price and its unit, and "
-        "(optional) the date you fixed. Write **variable** as the price for a share you left variable. Prices "
-        "**without** energy tax, network costs and VAT. Your consumption profile comes from the sidebar.",
-        "upload": "... or upload a table (CSV / Excel: year, commodity, share, price, unit, fixed_on)",
-        "run": "Compare with the strategies",
-        "wait": "Running the strategies on real prices (each decision re-fits the model; about a minute) ...",
-        "table": "Realised commodity cost per year (EUR k)",
-        "total": "TOTAL",
-        "worst": "WORST YEAR",
-        "detail": "How your cost was computed",
-        "proxy": "Your fixed prices vs the market proxy (30-day spot + 5%) on the day you fixed, EUR/MWh",
-        "note": "Same rules and real prices as the backtest (RESULTS.md). The strategies are not tuned to your data. "
-        "The HedgeWise ladder was designed after seeing 2021-2025, so its numbers are not independent evidence.",
-    },
-    "nl": {
-        "intro": "Vul in wat u echt heeft ingekocht per leveringsjaar: het vastgezette aandeel, de prijs en de "
-        "eenheid, en (optioneel) de datum waarop u vastzette. Schrijf **variabel** als prijs voor een deel dat "
-        "variabel bleef. Prijzen **zonder** energiebelasting, netkosten en btw. Uw verbruiksprofiel komt uit de "
-        "zijbalk.",
-        "upload": "... of upload een tabel (CSV / Excel: jaar, product, aandeel, prijs, eenheid, datum)",
-        "run": "Vergelijk met de strategieën",
-        "wait": "Strategieën doorrekenen op echte prijzen (elk besluit fit het model opnieuw; ongeveer een minuut) ...",
-        "table": "Gerealiseerde energiekosten per jaar (EUR k)",
-        "total": "TOTAAL",
-        "worst": "DUURSTE JAAR",
-        "detail": "Hoe uw kosten zijn berekend",
-        "proxy": "Uw vaste prijzen vs de marktprijs-benadering (30-daags spot + 5%) op de dag van vastzetten, EUR/MWh",
-        "note": "Zelfde regels en echte prijzen als de backtest (RESULTS.md). De strategieën zijn niet afgestemd op uw "
-        "data. De HedgeWise-ladder is ontworpen na het zien van 2021-2025; die cijfers zijn dus geen onafhankelijk "
-        "bewijs.",
-    },
-}
+def report_pdf(
+    a: hw.Analysis, lang: str, stress: dict | None, audit: object | None = None, green: pd.DataFrame | None = None
+) -> bytes:
+    """The PDF. Called only when someone clicks "Download" (Streamlit runs it on a separate thread, outside the
+    page script, so no Streamlit calls or caches in here); reportlab is imported only then."""
+    from hedgewise import report
 
-with tab_audit:
-    alang = st.radio("Language / Taal", ["EN", "NL"], horizontal=True, key="audit_lang").lower()
-    T = AUDIT_TXT[alang]
-    st.markdown(T["intro"])
+    buf = io.BytesIO()
+    with PLOT_LOCK:  # the PDF draws its charts with matplotlib too
+        report.make_report(a, buf, lang, stress=stress, audit=audit, green=green)
+    return buf.getvalue()
+
+
+# --------------------------------------------------------------------------------------------
+# Building blocks (used by the full dashboard and by interview mode)
+# --------------------------------------------------------------------------------------------
+def consumption_input(T: dict, name: str) -> tuple[hw.Company | None, list[str]]:
+    """Yearly totals + sector, or an uploaded bill file with the detected columns. (None, []) = waiting for a file."""
+    source = st.radio(T["source"], [T["src_yearly"], T["src_upload"]], help=T["source_help"], key="source")
+    sector = st.selectbox(
+        T["sector"], ci.SECTORS, help=T["sector_help"], key="sector", format_func=lambda x: sector_label(x, LANG)
+    )
+    if source == T["src_upload"]:
+        up = st.file_uploader(T["upload"], type=["csv", "txt", "xlsx", "xls"], key="bills")
+        if up is None:
+            st.info(T["upload_wait"])
+            return None, []
+        try:
+            table = ci.read_table(up)
+        except Exception as e:  # noqa: BLE001
+            st.error(T["read_error"].format(e=e))
+            return None, []
+        guess = ci.detect_columns(table)
+        cols, none = list(table.columns), T["none"]
+        st.caption(T["check_cols"])
+        dcol = st.selectbox(T["col_date"], cols, index=cols.index(guess["date"]) if guess["date"] else 0)
+        gcol = st.selectbox(
+            T["col_gas"], [none] + cols, index=([none] + cols).index(guess["gas"]) if guess["gas"] else 0
+        )
+        gunit = st.selectbox(T["unit_gas"], ci.GAS_UNITS, index=ci.GAS_UNITS.index(guess["gas_unit"]))
+        pcol = st.selectbox(
+            T["col_power"], [none] + cols, index=([none] + cols).index(guess["power"]) if guess["power"] else 0
+        )
+        punit = st.selectbox(T["unit_power"], ci.POWER_UNITS, index=ci.POWER_UNITS.index(guess["power_unit"]))
+        mapping = {
+            "date": dcol,
+            "gas": None if gcol == none else gcol,
+            "power": None if pcol == none else pcol,
+            "gas_unit": gunit,
+            "power_unit": punit,
+        }
+        try:
+            res = ci.company_from_frame(table, mapping, name, sector)
+        except ValueError as e:
+            st.error(str(e))
+            return None, []
+        with st.expander(T["preview"]):
+            st.dataframe(table.head(15), width="stretch")
+    else:
+        gas = st.number_input(T["gas_year"], 0.0, 1e9, 1_200_000.0, step=50_000.0, format="%.0f", key="gas")
+        gunit = st.selectbox(T["unit_gas"], ci.GAS_UNITS, index=0, key="gunit")
+        power = st.number_input(T["power_year"], 0.0, 1e9, 5_000.0, step=250.0, format="%.0f", key="power")
+        punit = st.selectbox(T["unit_power"], ci.POWER_UNITS, index=1, key="punit")
+        try:
+            res = ci.from_yearly(gas, gunit, power, punit, sector, name)
+        except ValueError as e:
+            st.error(str(e))
+            return None, []
+    company = res.company
+    st.success(
+        T["volumes"].format(gas=number(sum(company.gas_m3), LANG), power=number(sum(company.power_kwh) / 1e3, LANG))
+    )
+    for n_ in res.warnings:
+        st.warning(warning_text(n_, LANG))
+    return company, res.warnings
+
+
+def run_analysis(
+    company: hw.Company, T: dict, as_of: str, n: int, lam: float, budget: float | str | None, allow_timing: bool
+) -> tuple:
+    """Fit, simulate, analyse (all cached where possible). Returns (model, analysis, stress, cache key)."""
+    ds = str(pd.Timestamp(year=pd.Timestamp(as_of).year + 1, month=1, day=1).date())
+    with st.spinner(T["spinner"]):
+        m = fitted(as_of)
+        s = sims(as_of, ds, n, DEFAULT_SEED)
+        a = hw.analyse(m, company, ds, n, DEFAULT_SEED, lam, sims=s, allow_timing=allow_timing, budget=budget)
+    try:
+        stress = hw.stress_test(a, load())
+    except ValueError:
+        stress = None
+    key = (as_of, ds, n, lam, budget, allow_timing, company.name, company.gas_m3, company.power_kwh)
+    return m, a, stress, key
+
+
+def show_headline(a: hw.Analysis, T: dict, lang: str) -> None:
+    """Four metrics and the advice in words."""
+    var_row, hw_row = a.table.loc["All variable"], a.table.iloc[-1]
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric(T["m_expected"], eur_m(var_row.expected, lang))
+    c2.metric(T["m_bad"], eur_m(var_row.es95, lang), help=T["m_bad_help"])
+    c3.metric(
+        T["m_bad_hw"],
+        eur_m(hw_row.es95, lang),
+        delta="-" + eur_m(var_row.es95 - hw_row.es95, lang),
+        delta_color="inverse",
+    )
+    rg, rp = a.recommendation["hedge_gas"], a.recommendation["hedge_power"]
+    c4.metric(
+        T["m_share"], f"{rg:.0%}" if np.isclose(rg, rp) else T["share_split"].format(g=f"{rg:.0%}", p=f"{rp:.0%}")
+    )
+    st.info(recommendation_md(a, lang))
+
+
+def show_stress(stress: dict | None, key: tuple, T: dict, lang: str) -> None:
+    """The 2022 stress scenarios: chart and one line each."""
+    if not stress:
+        return
+    st.subheader(T["stress_h"])
+    sc1, sc2 = st.columns([3, 2])
+    sc1.image(stress_png(key, lang, stress), width="stretch")
+    for sc in stress["scenarios"]:
+        b, p = sc["bills"], sc["avg_price"]
+        sc2.markdown(
+            T["stress_line"].format(
+                label=sc["label"][lang],
+                g=p["gas"],
+                p=p["power"],
+                v=eur_m(b["All variable"], lang),
+                h=eur_m(b["HedgeWise"], lang),
+                f=eur_m(b["Fix 100% now"], lang),
+            )
+        )
+    sc2.caption(T["stress_note"])
+
+
+def audit_ui(company: hw.Company, T: dict, lang: str) -> None:
+    """Past contracts: editable table (or upload), comparison with the strategies, sentence, chart."""
+    st.markdown(T["audit_intro"])
+    cols = T["audit_cols"]
     example = au.read_contracts(hw.DATA / "audit_example.csv")
     default_rows = pd.DataFrame(
         [
             {
-                "year": k.year,
-                "commodity": k.commodity,
-                "share_%": round(k.share * 100) if k.price_eur_mwh is not None else None,
-                "price": k.price_entered.split(" ")[0],
-                "unit": k.price_entered.split(" ", 1)[1] if " " in k.price_entered else "",
-                "fixed_on": "" if k.fixed_on is None else str(k.fixed_on.date()),
+                cols["year"]: k.year,
+                cols["commodity"]: k.commodity,
+                cols["share_%"]: round(k.share * 100) if k.price_eur_mwh is not None else None,
+                cols["price"]: k.price_entered.split(" ")[0],
+                cols["unit"]: k.price_entered.split(" ", 1)[1] if " " in k.price_entered else "",
+                cols["fixed_on"]: "" if k.fixed_on is None else str(k.fixed_on.date()),
             }
             for k in example
         ]
     )
-    up_c = st.file_uploader(T["upload"], type=["csv", "txt", "xlsx", "xls"], key="audit_upload")
+    up_c = st.file_uploader(T["audit_upload"], type=["csv", "txt", "xlsx", "xls"], key="audit_upload")
     if up_c is not None:
         try:
             default_rows = ci.read_table(up_c)
@@ -396,41 +250,232 @@ with tab_audit:
         default_rows,
         num_rows="dynamic",
         width="stretch",
-        key="audit_table",
+        key=f"audit_table_{lang}",
         column_config={
-            "commodity": st.column_config.SelectboxColumn(options=["gas", "power"]),
-            "unit": st.column_config.SelectboxColumn(options=au.PRICE_UNITS + [""]),
+            cols["commodity"]: st.column_config.SelectboxColumn(options=["gas", "power"]),
+            cols["unit"]: st.column_config.SelectboxColumn(options=au.PRICE_UNITS + [""]),
         },
     )
-    if st.button(T["run"], type="primary"):
+    if st.button(T["audit_run"], type="primary"):
         st.session_state["audit_go"] = True
-    if st.session_state.get("audit_go"):
-        try:
-            tbl = edited.copy()
-            if "share_%" in tbl:  # the editor's column is in percent; an uploaded table keeps its own format
-                tbl["share"] = [None if pd.isna(v) or v == "" else f"{v}%" for v in tbl.pop("share_%")]
-            contracts = au.read_contracts(tbl)
-            years = au.audited_years(contracts, df)
-        except ValueError as e:
-            st.error(str(e))
-            st.stop()
-        with st.spinner(T["wait"]):
-            strat = audit_strategies(company.gas_m3, company.power_kwh, max(years))
-        r = au.run_audit(contracts, company, df, strategies=strat)
-        st.success(au.sentence(r, alang))
-        show = (r.table / 1e3).round(0).astype(int)
-        show.loc[T["total"]] = (r.table.sum() / 1e3).round(0).astype(int)
-        show.loc[T["worst"]] = (r.table.max() / 1e3).round(0).astype(int)
-        show.columns = [au.label(c, alang) for c in show.columns]
-        st.subheader(T["table"])
-        st.dataframe(show, width="stretch")
-        buf = io.BytesIO()
-        au.plot_audit(r, buf, alang)
-        st.image(buf.getvalue(), width="stretch")
-        st.caption(T["note"])
-        with st.expander(T["detail"]):
-            st.dataframe(r.detail.round(2), width="stretch", hide_index=True)
-            if r.contracts.fixed_on.notna().any():
-                st.caption(T["proxy"])
-                st.dataframe(r.contracts.dropna(subset=["fixed_on"]).round(1), width="stretch", hide_index=True)
-        st.session_state["audit_result"] = ((company.gas_m3, company.power_kwh), r)
+    if not st.session_state.get("audit_go"):
+        return
+    try:
+        tbl = edited.rename(columns={v: k for k, v in cols.items()}).copy()
+        if "share_%" in tbl:  # the editor's column is in percent; an uploaded table keeps its own format
+            tbl["share"] = [None if pd.isna(v) or v == "" else f"{v}%" for v in tbl.pop("share_%")]
+        contracts = au.read_contracts(tbl)
+        years = au.audited_years(contracts, load())
+    except ValueError as e:
+        st.error(str(e))
+        return
+    with st.spinner(T["audit_wait"]):
+        strat = audit_strategies(company.gas_m3, company.power_kwh, max(years))
+    r = au.run_audit(contracts, company, load(), strategies=strat)
+    st.success(au.sentence(r, lang))
+    show = (r.table / 1e3).round(0).astype(int)
+    show.loc[T["audit_total"]] = (r.table.sum() / 1e3).round(0).astype(int)
+    show.loc[T["audit_worst"]] = (r.table.max() / 1e3).round(0).astype(int)
+    show.columns = [au.label(c, lang) for c in show.columns]
+    st.subheader(T["audit_table"])
+    st.dataframe(show, width="stretch")
+    buf = io.BytesIO()
+    with PLOT_LOCK:
+        au.plot_audit(r, buf, lang)
+    st.image(buf.getvalue(), width="stretch")
+    st.caption(T["audit_note"])
+    with st.expander(T["audit_detail"]):
+        st.dataframe(r.detail.round(2), width="stretch", hide_index=True)
+        if r.contracts.fixed_on.notna().any():
+            st.caption(T["audit_proxy"])
+            st.dataframe(r.contracts.dropna(subset=["fixed_on"]).round(1), width="stretch", hide_index=True)
+    st.session_state["audit_result"] = ((company.gas_m3, company.power_kwh), r)
+
+
+def pdf_button(
+    container: object,
+    a: hw.Analysis,
+    m: hw.FittedModel,
+    company: hw.Company,
+    stress: dict | None,
+    green_t: pd.DataFrame | None,
+    T: dict,
+    rep_lang: str,
+) -> None:
+    """Download button for the PDF, with page 2 (past contracts) when an audit was run for this profile."""
+    prev = st.session_state.get("audit_result")
+    audit_page = None
+    if prev is not None and prev[0] == (company.gas_m3, company.power_kwh) and container.checkbox(T["add_audit"], True):
+        audit_page = prev[1]
+    container.download_button(
+        T["download"],
+        lambda: report_pdf(a, rep_lang, stress, audit_page, green_t),  # built on click, not on every rerun
+        type="primary",
+        file_name=report_path(company.name, m.as_of).name,
+        mime="application/pdf",
+    )
+
+
+# --------------------------------------------------------------------------------------------
+# Page
+# --------------------------------------------------------------------------------------------
+df = load()
+# Links can preset the language and the mode, e.g. https://<app>/?lang=nl&mode=interview (TEAM_GUIDE.md);
+# &contracts=example also ticks step 3 and runs the example contracts (for demos and screenshots).
+qp = st.query_params
+with st.sidebar:
+    lang = st.radio(
+        UI["en"]["lang"], ["EN", "NL"], index=int(qp.get("lang", "en").lower() == "nl"), horizontal=True, key="lang"
+    ).lower()
+    LANG = lang  # used by the building blocks above
+    T = UI[lang]
+    interview = st.toggle(
+        T["interview"], value=qp.get("mode") == "interview", key="interview", help=T["interview_help"]
+    )
+if qp.get("contracts") == "example":
+    st.session_state.setdefault("audit_go", True)
+st.title("⚡ HedgeWise")
+st.caption(T["caption"].format(date=f"{df.index.max():%d-%m-%Y}"))
+
+if interview:
+    # ---------------- interview mode: 5 steps, no model settings ----------------
+    st.sidebar.info(T["interview_on"])
+    st.subheader(T["step1"])
+    name = st.text_input(T["name"], "", key="iv_name") or "Company"
+    st.subheader(T["step2"])
+    st.caption(T["step2_help"])
+    company, _ = consumption_input(T, name)
+    if company is None:
+        st.info(T["step_wait"])
+        st.stop()
+    st.subheader(T["step3"])
+    if st.checkbox(T["step3_check"], value=qp.get("contracts") == "example", key="iv_audit"):
+        audit_ui(company, T, lang)
+    st.subheader(T["step4"])
+    as_of = str(df.index.max().date())
+    m, a, stress, key = run_analysis(company, T, as_of, APP["default_scenarios"], DEFAULT_RISK_AVERSION, None, False)
+    show_headline(a, T, lang)
+    st.image(frontier_png(key, lang, a), width="stretch")
+    show_stress(stress, key, T, lang)
+    st.subheader(T["step5"])
+    st.caption(T["pdf_ready"])
+    pdf_button(st, a, m, company, stress, None, T, lang)
+    st.stop()
+
+# ---------------- full dashboard ----------------
+with st.sidebar:
+    st.header(T["company_h"])
+    name = st.text_input(T["name"], "Limburg food processor", key="name")
+    company, _ = consumption_input(T, name)
+    if company is None:
+        st.stop()
+    st.header(T["green_h"])
+    g_solar = st.number_input(T["solar"], 0, 20_000, 0, step=100, key="g_solar")
+    g_batt = st.number_input(T["battery"], 0, 50_000, 0, step=250, key="g_batt")
+    g_bkw = st.number_input(T["battery_kw"], 0, 50_000, 0, step=250, key="g_bkw")
+    g_ppa = st.slider(T["ppa"], 0, 100, 0, 5, key="g_ppa")
+    g_ppa_price = st.number_input(T["ppa_price"], 0.0, 1000.0, 0.0, step=5.0, key="g_ppa_price")
+    g_ppa_years = st.number_input(T["ppa_years"], 1, 25, 10, key="g_ppa_years")
+    inv = gr.Investments(
+        solar_kwp=float(g_solar),
+        battery_kwh=float(g_batt),
+        battery_kw=float(g_bkw) or None,
+        ppa_share=g_ppa / 100,
+        ppa_price=g_ppa_price or None,
+        ppa_years=int(g_ppa_years),
+    )
+
+    st.header(T["decision_h"])
+    dates = {
+        T["date_today"]: str(df.index.max().date()),
+        T["date_2021"]: "2021-06-30",
+        T["date_2022"]: "2022-06-30",
+        T["date_custom"]: None,
+    }
+    choice = st.selectbox(T["date"], list(dates), key="date")
+    as_of = dates[choice] or str(
+        st.date_input(
+            T["as_of"], pd.Timestamp("2021-09-30"), min_value=pd.Timestamp("2020-01-31"), max_value=df.index.max()
+        )
+    )
+    mode = st.radio(T["goal"], [T["goal_balance"], T["goal_budget"]], key="goal")
+    if mode == T["goal_balance"]:
+        lam = st.slider(T["risk"], 0.0, 1.0, DEFAULT_RISK_AVERSION, 0.1, help=T["risk_help"], key="risk")
+        budget = None
+    else:
+        lam = DEFAULT_RISK_AVERSION
+        b = st.number_input(T["budget"], 0, 100_000_000, 0, step=50_000, key="budget")
+        budget = "auto" if b == 0 else b
+    allow_timing = st.checkbox(T["timing"], False, key="timing")
+    n = st.select_slider(T["scenarios"], APP["scenario_choices"], APP["default_scenarios"], key="n")
+
+tab_today, tab_audit = st.tabs([T["tab_today"], T["tab_audit"]])
+
+with tab_today:
+    m, a, stress, key = run_analysis(company, T, as_of, n, lam, budget, allow_timing)
+    var_row = a.table.loc["All variable"]
+    green_t = gr.evaluate(a, inv)[0] if inv.any() else None
+    show_headline(a, T, lang)
+    rc1, rc2, _ = st.columns([1, 2, 3])
+    rep_lang = rc1.radio(T["report_lang"], ["EN", "NL"], index=["en", "nl"].index(lang), horizontal=True).lower()
+    pdf_button(rc2, a, m, company, stress, green_t, T, rep_lang)
+
+    extra = ()
+    if green_t is not None:
+        extra = tuple(
+            (T["plan_plus"].format(inv=r.investment if lang == "en" else r.label_nl), r.es95, r.expected)
+            for r in green_t.itertuples()
+        )
+    st.image(frontier_png(key, lang, a, extra), width="stretch")
+    st.caption(T["frontier_caption"] + hw.frontier_scale_sentence(a, lang))
+    with st.expander(T["more_charts"]):
+        st.image(analysis_png(key, a), width="stretch")
+
+    show_stress(stress, key, T, lang)
+
+    st.subheader(T["strategies_h"])
+    st.dataframe(strategy_table(a, lang), width="stretch")
+
+    ds = a.delivery_start
+    if ds + pd.DateOffset(years=1) <= df.index.max():
+        real = {c: df.loc[ds : f"{ds.year}-12-31", c] for c in ("gas", "power")}
+        rb = sum(
+            float(v @ real[c].groupby(real[c].index.month).mean().values)
+            for c, v in (("gas", company.gas_mwh), ("power", company.power_mwh))
+        )
+        st.warning(
+            T["what_happened"].format(
+                y=ds.year, r=eur_m(rb, lang), e=eur_m(var_row.expected, lang), b=eur_m(var_row.es95, lang)
+            )
+        )
+
+    st.subheader(T["green_section"])
+    if green_t is None:
+        st.info(T["green_none"])
+    else:
+        st.markdown(gr.summary_text(green_t, lang))
+        cols = gr.TABLE_COLUMNS[lang]
+        show = (
+            green_t.assign(name=green_t.investment if lang == "en" else green_t.label_nl)
+            .set_index("name")[list(cols)]
+            .rename(columns=cols)
+        )
+        st.dataframe(
+            show.style.format(
+                {c: "{:,.0f}" for c in list(cols.values())[:5]}
+                | {c: (lambda v: "–" if v is None or pd.isna(v) else f"{v:.1f}") for c in list(cols.values())[5:]}
+            ),
+            width="stretch",
+        )
+        with st.expander(T["assumptions"]):
+            for line in gr.assumptions_text(lang):
+                st.markdown("- " + line)
+
+    with st.expander(T["model_details"]):
+        st.code(hw.describe(m))
+        src = a.recommendation["price_source"]
+        st.markdown(T["fixed_used"] + "; ".join(f"{k} €{a.fwd_now[k]:.1f}/MWh ({v})" for k, v in src.items()))
+        st.caption(T["model_note"])
+
+with tab_audit:
+    audit_ui(company, T, lang)
