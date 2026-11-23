@@ -1,4 +1,10 @@
-# HedgeWise: results on real data (v0.6, 23 Nov 2026)
+# HedgeWise: results on real data (v0.7, 23 Nov 2026)
+
+**v0.7** adds evidence and tools; the model maths and the 2021–2025 numbers are unchanged (golden test):
+- **Robustness:** synthetic 8-year futures and stress paths, and the backtest on German and Belgian power, 2020–2025
+- **Procurement audit:** a company's real past contracts vs the strategies ("what would HedgeWise have saved you?")
+- **Green investments:** solar, battery and PPA as hedges, with hourly price shapes and payback
+- Market size from CBS data (`MARKET.md`), the app in Dutch and English with an interview mode, `TEAM_GUIDE.md`
 
 **v0.4 (for the 8 Dec Speeddate)** adds tools for real interviews; it does not change the model maths:
 - read real bills: any CSV or Excel export, Dutch formats, or yearly totals + sector

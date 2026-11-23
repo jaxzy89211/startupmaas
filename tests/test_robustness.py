@@ -135,3 +135,28 @@ def test_fit_survives_a_constant_power_series(state):
     m = hw.fit(h, "2026-10-31")
     assert np.isfinite(m.corr).all() and np.linalg.eigvalsh(m.corr).min() > 0
     np.linalg.cholesky(m.corr)
+
+
+def test_a_failed_history_is_recorded_and_left_out(state, monkeypatch):
+    def boom(*a, **k):
+        raise ValueError("Encountered all NA values")
+
+    monkeypatch.setattr(rb, "run_history", boom)
+    row = rb._task(("bootstrap", 542))
+    assert list(row.strategy) == [rb.FAILED] and "all NA" in row.error.iloc[0]
+    ok = pd.DataFrame(
+        [
+            {
+                "family": "bootstrap",
+                "history": "1",
+                "strategy": "All variable",
+                "total": 1.0,
+                "worst_year": 1.0,
+                "max_jump": 0.0,
+            }
+        ]
+    )
+    per = pd.concat([ok, row], ignore_index=True)
+    s = rb.summarise(per)
+    assert list(s.strategy) == ["All variable"] and s.n.iloc[0] == 1
+    assert rb.failures(per).to_dict() == {"bootstrap": 1}

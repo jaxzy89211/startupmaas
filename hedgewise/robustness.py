@@ -189,7 +189,13 @@ def _init_worker() -> None:
     _STATE["idx"] = future_index(real, first)
 
 
+FAILED = "FAILED"  # strategy name of the single row saved for a history that could not be run
+
+
 def _task(task: tuple[str, int | str]) -> pd.DataFrame:
+    """Build one history and run every strategy on it. A history whose backtest fails (e.g. a degenerate bootstrap
+    path with non-finite prices) is saved as one FAILED row with the error, so one bad path can't stop a long run;
+    summarise() leaves it out and failures() counts it."""
     family, key = task
     real, idx = _STATE["real"], _STATE["idx"]
     if family == "model":
@@ -198,9 +204,17 @@ def _task(task: tuple[str, int | str]) -> pd.DataFrame:
         df = bootstrap_history(real, idx, SEED0 + int(key))
     else:
         df = stress_history(real, idx, str(key))
-    met = history_metrics(run_history(df, _STATE["years"], _STATE["company"]))
+    try:
+        met = history_metrics(run_history(df, _STATE["years"], _STATE["company"]))
+    except Exception as e:  # noqa: BLE001 - recorded, counted and reported, never silently dropped
+        return pd.DataFrame([{"strategy": FAILED, "family": family, "history": str(key), "error": repr(e)[:200]}])
     met["family"], met["history"] = family, str(key)
     return met.reset_index(names="strategy")
+
+
+def failures(per: pd.DataFrame) -> pd.Series:
+    """Number of histories per family that could not be run."""
+    return per[per.strategy == FAILED].groupby("family").size()
 
 
 # --------------------------------------------------------------------------------------------
@@ -208,6 +222,7 @@ def _task(task: tuple[str, int | str]) -> pd.DataFrame:
 # --------------------------------------------------------------------------------------------
 def summarise(per: pd.DataFrame) -> pd.DataFrame:
     """Per family and strategy: median total, P95 worst year, P95 jump, % 'beats all-variable' (definition above)."""
+    per = per[per.strategy != FAILED]
     base = per[per.strategy == "All variable"].set_index(["family", "history"])
     p = per.join(base[["total", "worst_year"]].add_prefix("var_"), on=["family", "history"])
     p["wins"] = (p.worst_year < p.var_worst_year) & (p.total < (1 + EXTRA_COST) * p.var_total)
@@ -334,12 +349,12 @@ def _task_ref(task: tuple[str, int | str]) -> pd.DataFrame:
     return _task(task)
 
 
-def run_chunked(histories: int, workers: int, chunk_size: int) -> pd.DataFrame:
+def run_chunked(histories: int, workers: int, chunk_size: int, chunk_dir: Path | None = None) -> pd.DataFrame:
     """Run all tasks in chunks of `chunk_size`, saving each finished chunk to disk before starting the next.
     A crash loses at most the chunk in progress; rerunning the same command resumes from the saved chunks."""
     tasks = make_tasks(histories)
     chunks = [tasks[i : i + chunk_size] for i in range(0, len(tasks), chunk_size)]
-    run_dir = _run_dir(ROBUSTNESS_PATHS, chunk_size)
+    run_dir = chunk_dir or _run_dir(ROBUSTNESS_PATHS, chunk_size)
     run_dir.mkdir(parents=True, exist_ok=True)
 
     def keys(chunk: list[tuple[str, int | str]]) -> set[tuple[str, str]]:
@@ -397,12 +412,20 @@ def main(argv: list[str] | None = None) -> pd.DataFrame:
     ap.add_argument("--histories", type=int, default=1000, help="per family (model and bootstrap)")
     ap.add_argument("--workers", type=int, default=min(4, os.cpu_count() or 1), help="worker processes (max 4)")
     ap.add_argument("--chunk-size", type=int, default=20, help="histories per saved chunk")
+    ap.add_argument(
+        "--chunk-dir",
+        type=Path,
+        help="resume from this folder of saved chunks instead of the one named after the current config/data hash. "
+        "Only valid if nothing that affects the model, data or backtest changed since those chunks were saved "
+        "(e.g. only unrelated config sections were added); say so when you use it.",
+    )
     args = ap.parse_args(argv)
     workers = max(1, min(args.workers, 4))
     hw.OUT.mkdir(exist_ok=True)
     hw.load_prices()  # registers provenance in this process
-    per = run_chunked(args.histories, workers, args.chunk_size)
+    per = run_chunked(args.histories, workers, args.chunk_size, args.chunk_dir)
     summary = summarise(per)
+    fails = failures(per)
     write_csv(per, hw.OUT / "robustness_histories.csv", index=False)
     write_csv(summary, hw.OUT / "robustness_table.csv", index=False)
     plot_robustness(summary, per, hw.OUT / "robustness.png")
@@ -421,5 +444,7 @@ def main(argv: list[str] | None = None) -> pd.DataFrame:
     show["pct_beats_variable"] = (show.pct_beats_variable * 100).round(0).astype(int).astype(str) + "%"
     print("\nEUR k; HedgeWise strategies use", ROBUSTNESS_PATHS, "scenarios per decision")
     print(show.to_string(index=False))
+    if len(fails):
+        print("Histories that could not be run (left out of the summary): " + fails.to_dict().__repr__())
     print("Provenance: " + one_line())
     return summary
